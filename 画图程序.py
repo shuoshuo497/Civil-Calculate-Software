@@ -2,7 +2,6 @@ import sys
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-import numpy as np
 
 
 class TrussDrawingWidget(QWidget):
@@ -20,6 +19,8 @@ class TrussDrawingWidget(QWidget):
         self.end_y_input = QLineEdit()
         self.add_button = QPushButton("Add Segment")
         self.add_button.clicked.connect(self.add_segment)
+        self.undo_button = QPushButton("Undo")
+        self.undo_button.clicked.connect(self.undo_segment)
         self.show_nodes_button = QPushButton("Show Nodes")
         self.show_nodes_button.clicked.connect(self.show_nodes)
 
@@ -37,7 +38,7 @@ class TrussDrawingWidget(QWidget):
         self.segment_index = 1
         self.node_index = 1
         self.node_dict = {}
-        self.segment_dict = []
+        self.segments_dict = {}
 
         # 设置布局
         layout = QVBoxLayout()
@@ -53,8 +54,11 @@ class TrussDrawingWidget(QWidget):
         form_layout.addWidget(self.end_y_label)
         form_layout.addWidget(self.end_y_input)
         layout.addLayout(form_layout)
-        layout.addWidget(self.add_button)
-        layout.addWidget(self.show_nodes_button)
+        button_layout = QHBoxLayout()
+        button_layout.addWidget(self.add_button)
+        button_layout.addWidget(self.undo_button)
+        button_layout.addWidget(self.show_nodes_button)
+        layout.addLayout(button_layout)
         layout.addWidget(self.canvas)
         self.setLayout(layout)
 
@@ -86,19 +90,29 @@ class TrussDrawingWidget(QWidget):
             end_node_index = self.node_dict[(end_x, end_y)]
 
         # 绘制线段
-        self.ax.plot([start_x, end_x], [start_y, end_y], 'b-')
-        self.ax.plot(mid_x, mid_y, 'ro')  # 在中点处标注红点
+        line, = self.ax.plot([start_x, end_x], [start_y, end_y], 'b-')
+        mid_point, = self.ax.plot(mid_x, mid_y, 'ro')  # 在中点处标注红点
         self.ax.text(mid_x, mid_y, str(self.segment_index), color='red', fontsize=12, ha='center', va='center')
 
         # 绘制结点
-        self.ax.plot(start_x, start_y, 'bo')  # 起点
+        start_point, = self.ax.plot(start_x, start_y, 'bo')  # 起点
         self.ax.text(start_x, start_y, str(start_node_index), color='blue', fontsize=12, ha='right', va='bottom')
-        self.ax.plot(end_x, end_y, 'bo')  # 终点
+        end_point, = self.ax.plot(end_x, end_y, 'bo')  # 终点
         self.ax.text(end_x, end_y, str(end_node_index), color='blue', fontsize=12, ha='right', va='bottom')
 
-        # 记录线段对应的结点编号和坐标
-        self.segment_dict.append(((start_node_index, (start_x, start_y)),
-                                  (end_node_index, (end_x, end_y))))
+        # 记录线段对象和对应的结点编号和坐标
+        segment_data = {
+            "line": line,
+            "mid_point": mid_point,
+            "start_point": start_point,
+            "end_point": end_point,
+            "start_node_index": start_node_index,
+            "end_node_index": end_node_index,
+            "start_coord": (start_x, start_y),
+            "end_coord": (end_x, end_y),
+            "segment_index": self.segment_index
+        }
+        self.segments_dict[self.segment_index] = segment_data
 
         # 更新线段序号
         self.segment_index += 1
@@ -107,10 +121,79 @@ class TrussDrawingWidget(QWidget):
         self.ax.axis('equal')
         self.canvas.draw()
 
+    def undo_segment(self):
+        if self.segments_dict:
+            last_segment_index = max(self.segments_dict.keys())
+            last_segment = self.segments_dict.pop(last_segment_index)
+            start_coord = last_segment["start_coord"]
+            end_coord = last_segment["end_coord"]
+            # 删除对应的线段和结点
+            del last_segment["line"]
+            del last_segment["mid_point"]
+            del last_segment["start_point"]
+            del last_segment["end_point"]
+            if self.is_node_unused(start_coord):
+                del self.node_dict[start_coord]
+            if self.is_node_unused(end_coord):
+                del self.node_dict[end_coord]
+            # 重新绘制图形
+            self.draw_graph()
+        else:
+            QMessageBox.warning(self, "Undo Failed", "No segments to undo.")
+
+    def draw_graph(self):
+        # 清空画布
+        self.ax.clear()
+        # 重新绘制所有结点和线段
+        for segment_data in self.segments_dict.values():
+            self.draw_segment(segment_data)
+        for coord, node_index in self.node_dict.items():
+            self.draw_node(coord, node_index)
+        # 更新图形
+        self.ax.axis('equal')
+        self.ax.grid(True)
+        self.canvas.draw()
+
+    def draw_graph(self):
+        # 清空画布
+        self.ax.clear()
+        # 重新绘制所有结点和线段
+        for segment_data in self.segments_dict.values():
+            self.draw_segment(segment_data)
+        # 更新图形
+        self.ax.axis('equal')
+        self.ax.grid(True)
+        self.canvas.draw()
+
+    def draw_segment(self, segment_data):
+        start_x, start_y = segment_data["start_coord"]
+        end_x, end_y = segment_data["end_coord"]
+        mid_x, mid_y = (start_x + end_x) / 2, (start_y + end_y) / 2
+        line = self.ax.plot([start_x, end_x], [start_y, end_y], 'b-')[0]
+        mid_point = self.ax.plot(mid_x, mid_y, 'ro')[0]
+        self.ax.text(mid_x, mid_y, str(segment_data["segment_index"]), color='red', fontsize=12, ha='center',
+                     va='center')
+        self.ax.plot(start_x, start_y, 'bo')  # 起点
+        self.ax.text(start_x, start_y, str(segment_data["start_node_index"]), color='blue', fontsize=12, ha='right',
+                     va='bottom')
+        self.ax.plot(end_x, end_y, 'bo')  # 终点
+        self.ax.text(end_x, end_y, str(segment_data["end_node_index"]), color='blue', fontsize=12, ha='right',
+                     va='bottom')
+
+    def is_node_unused(self, coord):
+        for segment_data in self.segments_dict.values():
+            if segment_data["start_coord"] == coord or segment_data["end_coord"] == coord:
+                return False
+        return True
+
     def show_nodes(self):
         # 创建一个空字符串用于记录结点信息
         nodes_info = ""
-        for i, ((start_node_index, start_coord), (end_node_index, end_coord)) in enumerate(self.segment_dict, start=1):
+        for i, segment_data in self.segments_dict.items():
+            start_node_index = segment_data["start_node_index"]
+            start_coord = segment_data["start_coord"]
+            end_node_index = segment_data["end_node_index"]
+            end_coord = segment_data["end_coord"]
             nodes_info += f"Segment {i} : Node {start_node_index} {start_coord}, Node {end_node_index} {end_coord}\n"
 
         # 弹出消息框显示结点信息
@@ -123,4 +206,3 @@ if __name__ == "__main__":
     window.setWindowTitle("Truss Drawing")
     window.show()
     sys.exit(app.exec_())
-
