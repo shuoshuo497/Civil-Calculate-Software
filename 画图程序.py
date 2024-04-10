@@ -1,5 +1,5 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox
+from PyQt5.QtWidgets import QApplication, QWidget,QInputDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
@@ -198,6 +198,7 @@ class TrussDrawingWidget(QWidget):
 
         # 弹出消息框显示结点信息
         QMessageBox.information(self, "Segments Information", nodes_info)
+
 
 
 if __name__ == "__main__":
