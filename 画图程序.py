@@ -1,5 +1,6 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QWidget,QInputDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox
+from PyQt5.QtWidgets import QApplication, QWidget, QInputDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, \
+    QPushButton, QMessageBox, QTableWidget, QTableWidgetItem, QComboBox, QDialog
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
@@ -39,6 +40,7 @@ class TrussDrawingWidget(QWidget):
         self.node_index = 1
         self.node_dict = {}
         self.segments_dict = {}
+        self.node_info_dict = {}  # 记录结点信息的字典
 
         # 设置布局
         layout = QVBoxLayout()
@@ -76,6 +78,7 @@ class TrussDrawingWidget(QWidget):
         # 检查起点是否已经存在，如果不存在则分配编号
         if (start_x, start_y) not in self.node_dict:
             self.node_dict[(start_x, start_y)] = self.node_index
+            self.node_info_dict[(start_x, start_y)] = {'index': self.node_index, 'support_type': 'None'}
             start_node_index = self.node_index
             self.node_index += 1
         else:
@@ -84,8 +87,10 @@ class TrussDrawingWidget(QWidget):
         # 检查终点是否已经存在，如果不存在则分配编号
         if (end_x, end_y) not in self.node_dict:
             self.node_dict[(end_x, end_y)] = self.node_index
+            self.node_info_dict[(end_x, end_y)] = {'index': self.node_index, 'support_type': 'None'}
             end_node_index = self.node_index
             self.node_index += 1
+            print(end_node_index)
         else:
             end_node_index = self.node_dict[(end_x, end_y)]
 
@@ -187,17 +192,78 @@ class TrussDrawingWidget(QWidget):
         return True
 
     def show_nodes(self):
-        # 创建一个空字符串用于记录结点信息
-        nodes_info = ""
-        for i, segment_data in self.segments_dict.items():
-            start_node_index = segment_data["start_node_index"]
-            start_coord = segment_data["start_coord"]
-            end_node_index = segment_data["end_node_index"]
-            end_coord = segment_data["end_coord"]
-            nodes_info += f"Segment {i} : Node {start_node_index} {start_coord}, Node {end_node_index} {end_coord}\n"
+        # 创建结点信息对话框，并设置父对象为当前窗口
+        self.node_info_dialog = self.NodeInfoDialog(self.node_info_dict, self.segments_dict, parent=self)
+        self.node_info_dialog.exec_()
 
-        # 弹出消息框显示结点信息
-        QMessageBox.information(self, "Segments Information", nodes_info)
+    def node_dialog_closed(self):
+        if self.node_info_dialog.result() == QDialog.Accepted:
+            self.draw_graph()
+
+    class NodeInfoDialog(QDialog):
+        def __init__(self, node_info_dict, segments_dict, parent=None):
+            super().__init__(parent=parent)
+
+            self.node_info_dict = node_info_dict
+            self.segments_dict = segments_dict
+
+            self.setWindowTitle("Node Information")
+            self.layout = QVBoxLayout()
+
+            # 创建结点信息表格
+            self.node_table = QTableWidget()
+            self.node_table.setColumnCount(4)  # 增加一个列用于选择承接条件
+            self.node_table.setHorizontalHeaderLabels(["Node Index", "X Coord", "Y Coord", "Support Type"])
+            self.layout.addWidget(self.node_table)
+
+            # 创建确认按钮
+            self.confirm_button = QPushButton("Confirm")
+            self.confirm_button.clicked.connect(self.confirm_support_type)
+            self.layout.addWidget(self.confirm_button)
+
+            self.setLayout(self.layout)
+
+            # 显示结点信息
+            self.show_node_info()
+
+        def show_node_info(self):
+
+            self.node_table.setRowCount(len(self.node_info_dict))
+            for i, (coord, node_data) in enumerate(self.node_info_dict.items()):
+                node_index = node_data['index']
+                x_coord, y_coord = coord
+                self.node_table.setItem(i, 0, QTableWidgetItem(str(node_index)))
+                self.node_table.setItem(i, 1, QTableWidgetItem(str(x_coord)))
+                self.node_table.setItem(i, 2, QTableWidgetItem(str(y_coord)))
+                # 创建下拉菜单
+                combo_box = QComboBox()
+                combo_box.addItem("No Support")
+                combo_box.addItem("Pinned Support")
+                combo_box.addItem("Sliding Support")
+                combo_box.addItem("Fixed Support")
+                support_type = node_data['support_type']
+                combo_box.setCurrentText(support_type)
+                self.node_table.setCellWidget(i, 3, combo_box)
+
+        def confirm_support_type(self):
+            for i in range(self.node_table.rowCount()):
+                node_index = int(self.node_table.item(i, 0).text())
+                print(node_index)
+                support_type = self.node_table.cellWidget(i, 3).currentText()
+                print(support_type)
+                # 更新结点支撑类型信息
+                for coord, node_data in self.node_info_dict.items():
+                    if node_data['index'] == node_index:
+                        node_data['support_type'] = support_type
+
+            self.parent().draw_graph()  # 在确认更新结点支撑类型后重新绘制图形
+            # 关闭对话框
+            self.accept()
+
+
+        def closeEvent(self, event):
+            self.parent().node_dialog_closed()
+            event.accept()
 
 
 
