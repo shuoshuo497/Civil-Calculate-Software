@@ -133,6 +133,9 @@ class TrussDrawingWidget(QWidget):
             start_coord = last_segment["start_coord"]
             end_coord = last_segment["end_coord"]
             # 删除对应的线段和结点
+
+            # 更新线段序号
+            self.segment_index -= 1
             del last_segment["line"]
             del last_segment["mid_point"]
             del last_segment["start_point"]
