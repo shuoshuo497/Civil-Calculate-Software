@@ -1,6 +1,5 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QWidget, QInputDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, \
-    QPushButton, QMessageBox, QTableWidget, QTableWidgetItem, QComboBox, QDialog
+from PyQt5.QtWidgets import QApplication, QWidget, QInputDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox, QTableWidget, QTableWidgetItem, QComboBox, QDialog
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
@@ -35,13 +34,6 @@ class TrussDrawingWidget(QWidget):
         self.ax.set_ylabel("Y")
         self.ax.grid(True)
 
-        # 初始化线段和结点的计数器和字典
-        self.segment_index = 1
-        self.node_index = 1
-        self.node_dict = {}
-        self.segments_dict = {}
-        self.node_info_dict = {}  # 记录结点信息的字典
-
         # 设置布局
         layout = QVBoxLayout()
         form_layout = QHBoxLayout()
@@ -63,6 +55,13 @@ class TrussDrawingWidget(QWidget):
         layout.addLayout(button_layout)
         layout.addWidget(self.canvas)
         self.setLayout(layout)
+        
+        # 初始化线段和结点的计数器和字典
+        self.segment_index = 1
+        self.node_index = 1
+        self.node_dict = {}
+        self.segments_dict = {}
+        self.node_info_dict = {}  # 记录结点信息的字典
 
     def add_segment(self):
         # 获取用户输入
@@ -129,23 +128,24 @@ class TrussDrawingWidget(QWidget):
     def undo_segment(self):
 
         if self.segments_dict:
-            last_segment_index = max(self.segments_dict.keys())
-            last_segment = self.segments_dict.pop(last_segment_index)
+            last_segment_key = max(self.segments_dict.keys())
+            last_segment_value = self.segments_dict[last_segment_key]
+            last_segment = self.segments_dict[last_segment_key]
             start_coord = last_segment["start_coord"]
             end_coord = last_segment["end_coord"]
-            # 删除对应的线段和结点
-            print(self.node_info_dict)
-            print(self.node_dict)
-            # 更新线段序号
-            self.segment_index -= 1
-            del last_segment["line"]
-            del last_segment["mid_point"]
-            del last_segment["start_point"]
-            del last_segment["end_point"]
+
             if self.is_node_unused(start_coord):
                 del self.node_dict[start_coord]
                 del self.node_info_dict[start_coord]
 
+            # 原始字典转换为列表
+            self.segments_dict_items = list(self.segments_dict.items()) 
+
+            # 删除键为"2"的项
+            self.segments_dict_items.remove((last_segment_key, last_segment_value))
+
+            # 重新索引键
+            self.segments_dict = {str(i+1): v for i, (k, v) in enumerate(self.segments_dict_items)}
 
             if self.is_node_unused(end_coord):
                 del self.node_dict[end_coord]
@@ -158,19 +158,6 @@ class TrussDrawingWidget(QWidget):
             self.draw_graph()
         else:
             QMessageBox.warning(self, "Undo Failed", "No segments to undo.")
-
-    def draw_graph(self):
-        # 清空画布
-        self.ax.clear()
-        # 重新绘制所有结点和线段
-        for segment_data in self.segments_dict.values():
-            self.draw_segment(segment_data)
-        for coord, node_index in self.node_dict.items():
-            self.draw_node(coord, node_index)
-        # 更新图形
-        self.ax.axis('equal')
-        self.ax.grid(True)
-        self.canvas.draw()
 
     def draw_graph(self):
         # 清空画布
