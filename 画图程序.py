@@ -127,13 +127,15 @@ class TrussDrawingWidget(QWidget):
         self.canvas.draw()
 
     def undo_segment(self):
+
         if self.segments_dict:
             last_segment_index = max(self.segments_dict.keys())
             last_segment = self.segments_dict.pop(last_segment_index)
             start_coord = last_segment["start_coord"]
             end_coord = last_segment["end_coord"]
             # 删除对应的线段和结点
-
+            print(self.node_info_dict)
+            print(self.node_dict)
             # 更新线段序号
             self.segment_index -= 1
             del last_segment["line"]
@@ -142,8 +144,16 @@ class TrussDrawingWidget(QWidget):
             del last_segment["end_point"]
             if self.is_node_unused(start_coord):
                 del self.node_dict[start_coord]
+                del self.node_info_dict[start_coord]
+
+
             if self.is_node_unused(end_coord):
                 del self.node_dict[end_coord]
+                del self.node_info_dict[end_coord]
+
+
+            print(self.node_info_dict)
+            print(self.node_dict)
             # 重新绘制图形
             self.draw_graph()
         else:
