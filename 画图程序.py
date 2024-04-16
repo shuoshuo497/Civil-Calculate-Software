@@ -1,5 +1,5 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QWidget, QInputDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox, QTableWidget, QTableWidgetItem, QComboBox, QDialog
+from PyQt5.QtWidgets import QApplication, QWidget,QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QMessageBox, QTableWidget, QTableWidgetItem, QComboBox, QDialog
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
@@ -133,7 +133,7 @@ class TrussDrawingWidget(QWidget):
             last_segment = self.segments_dict[last_segment_key]
             start_coord = last_segment["start_coord"]
             end_coord = last_segment["end_coord"]
-
+            self.segment_index -= 1
             if self.is_node_unused(start_coord):
                 del self.node_dict[start_coord]
                 del self.node_info_dict[start_coord]
