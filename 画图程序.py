@@ -172,17 +172,6 @@ class TrussDrawingWidget(QWidget):
         self.ax.grid(True)
         self.canvas.draw()
 
-    def draw_graph(self):
-        # 清空画布
-        self.ax.clear()
-        # 重新绘制所有结点和线段
-        for segment_data in self.segments_dict.values():
-            self.draw_segment(segment_data)
-        # 更新图形
-        self.ax.axis('equal')
-        self.ax.grid(True)
-        self.canvas.draw()
-
     def draw_segment(self, segment_data):
         start_x, start_y = segment_data["start_coord"]
         end_x, end_y = segment_data["end_coord"]
