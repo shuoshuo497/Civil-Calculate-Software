@@ -5,7 +5,6 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
 
-
 class TrussDrawingWidget(QWidget):
     def __init__(self):
         super().__init__()
@@ -123,7 +122,7 @@ class TrussDrawingWidget(QWidget):
             "start_coord": (start_x, start_y),
             "end_coord": (end_x, end_y),
             "segment_index": self.segment_index,
-            "stiffness":0
+            "stiffness": 0.0
         }
         self.segments_dict[self.segment_index] = segment_data
 
@@ -154,11 +153,9 @@ class TrussDrawingWidget(QWidget):
                 del self.node_dict[start_coord]
                 del self.node_info_dict[start_coord]
 
-
             if self.is_node_unused(end_coord):
                 del self.node_dict[end_coord]
                 del self.node_info_dict[end_coord]
-
 
             print(self.node_info_dict)
             print(self.node_dict)
@@ -167,18 +164,6 @@ class TrussDrawingWidget(QWidget):
         else:
             QMessageBox.warning(self, "Undo Failed", "No segments to undo.")
 
-    def draw_graph(self):
-        # 清空画布
-        self.ax.clear()
-        # 重新绘制所有结点和线段
-        for segment_data in self.segments_dict.values():
-            self.draw_segment(segment_data)
-        for coord, node_index in self.node_dict.items():
-            self.draw_node(coord, node_index)
-        # 更新图形
-        self.ax.axis('equal')
-        self.ax.grid(True)
-        self.canvas.draw()
 
     def draw_graph(self):
         # 清空画布
@@ -287,7 +272,6 @@ class TrussDrawingWidget(QWidget):
             # 关闭对话框
             self.accept()
 
-
         def closeEvent(self, event):
             self.parent().node_dialog_closed()
             event.accept()
@@ -337,6 +321,7 @@ class TrussDrawingWidget(QWidget):
                 print(segment_index)
                 print(stiffness_item)
                 for index, segment_data in self.segments_dict.items():
+                    print(segment_data['stiffness'])
                     if index == segment_index:
                         segment_data['stiffness'] = stiffness_item
 
@@ -345,9 +330,6 @@ class TrussDrawingWidget(QWidget):
             # 关闭对话框
             self.accept()
 
-        def closeEvent(self, event):
-            self.parent().node_dialog_closed()
-            event.accept()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
