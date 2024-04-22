@@ -1,0 +1,8 @@
+#新建数据库
+CREATE SCHEMA `civil_structure` DEFAULT CHARACTER SET utf8mb4 ;
+
+#新建数据库civil_structure下的表格
+create table civil_structure.login(
+snum INT auto_increment primary key,
+scode varchar(100)
+);
