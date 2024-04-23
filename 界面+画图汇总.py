@@ -1,6 +1,6 @@
 import mysql.connector
 import sys  # 导入系统模块
-from PySide2.QtWidgets import QApplication, QWidget, QInputDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, \
+from PyQt5.QtWidgets import QApplication, QWidget, QInputDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, \
     QPushButton, QMessageBox, QTableWidget, QTableWidgetItem, QComboBox, QDialog, QMainWindow
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
