@@ -1,6 +1,6 @@
 import mysql.connector
 import sys  # 导入系统模块
-from PySide2.QtWidgets import QApplication, QWidget, QInputDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, \
+from PyQt5.QtWidgets import QApplication, QWidget, QInputDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, \
     QPushButton, QMessageBox, QTableWidget, QTableWidgetItem, QComboBox, QDialog, QMainWindow
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -10,7 +10,7 @@ login_connection = {
     'port': 3306,
     'database': 'civil_structure',
     'user': 'root',
-    'password': '3489796033Lyh'}
+    'password': '1234'}
 
 class LoginWindow(QWidget):  # 登录页面类
     def __init__(self):
