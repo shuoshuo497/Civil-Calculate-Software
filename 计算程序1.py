@@ -3,7 +3,7 @@ from math import *
 import sys,os,sympy,codecs
 
 def main():
-    path="C:\\Users\\li_ju\\Desktop\\test.txt"
+    path="C:\\Users\\li_ju\\Desktop\\homework\\test.txt"
     try:
         file=codecs.open(path,'r',encoding='utf-8')
     except:
