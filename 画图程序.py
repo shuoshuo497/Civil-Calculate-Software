@@ -27,7 +27,8 @@ class TrussDrawingWidget(QWidget):
         self.show_nodes_button.clicked.connect(self.show_nodes)
         self.show_segments_button = QPushButton("Show Segments")
         self.show_segments_button.clicked.connect(self.show_segments)
-
+        self.save_button = QPushButton("Save to TXT")   #结点杆件数据保存至txt文件
+        self.save_button.clicked.connect(lambda: window.save_info_to_txt('truss_info.txt'))
         # 创建 Matplotlib 绘图窗口
         self.fig = Figure()
         self.canvas = FigureCanvas(self.fig)
@@ -69,7 +70,7 @@ class TrussDrawingWidget(QWidget):
         layout.addLayout(button_layout)
         layout.addWidget(self.canvas)
         self.setLayout(layout)
-
+        button_layout.addWidget(self.save_button)#增加结点杆件数据保存按钮
     def add_segment(self):
         # 获取用户输入
         start_x = float(self.start_x_input.text())
@@ -211,6 +212,17 @@ class TrussDrawingWidget(QWidget):
         if self.node_info_dialog.result() == QDialog.Accepted:
             self.draw_graph()
 
+    def save_info_to_txt(self, filename):
+        #增加结点杆件数据保存功能
+        with open(filename, 'w', encoding='utf-8') as f:
+            # 写入节点信息
+            f.write("Node Information:\n")
+            for coord, node_data in self.node_info_dict.items():
+                f.write(f"Node {node_data['index']}: Coord ({coord[0]}, {coord[1]}), Support Type: {node_data['support_type']}\n")    
+            # 写入杆件信息
+            f.write("\nSegment Information:\n")
+            for segment_data in self.segments_dict.values():
+                f.write(f"Segment {segment_data['segment_index']}: Start Node {segment_data['start_node_index']}, End Node {segment_data['end_node_index']}, Stiffness {segment_data['stiffness']}\n")
     class NodeInfoDialog(QDialog):
         def __init__(self, node_info_dict, segments_dict, parent=None):
             super().__init__(parent=parent)
@@ -275,7 +287,6 @@ class TrussDrawingWidget(QWidget):
         def closeEvent(self, event):
             self.parent().node_dialog_closed()
             event.accept()
-
     # 显示所有线段的表格
     # 用来填写刚度
     class ShowSegmentsDialog(QDialog):
