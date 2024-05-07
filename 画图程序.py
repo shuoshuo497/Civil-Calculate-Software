@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import QApplication, QWidget, QInputDialog, QVBoxLayout, QH
     QPushButton, QMessageBox, QTableWidget, QTableWidgetItem, QComboBox, QDialog
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-
+import math
 
 class TrussDrawingWidget(QWidget):
     def __init__(self):
@@ -27,8 +27,8 @@ class TrussDrawingWidget(QWidget):
         self.show_nodes_button.clicked.connect(self.show_nodes)
         self.show_segments_button = QPushButton("Show Segments")
         self.show_segments_button.clicked.connect(self.show_segments)
-        self.save_button = QPushButton("Save to TXT")   #结点杆件数据保存至txt文件
-        self.save_button.clicked.connect(lambda: window.save_info_to_txt('truss_info.txt'))
+        self.save_button = QPushButton("Save to TXT")   #将所需计算数据保存至txt文件
+        self.save_button.clicked.connect(lambda: window.save_info_to_txt('计算数据.txt'))
         # 创建 Matplotlib 绘图窗口
         self.fig = Figure()
         self.canvas = FigureCanvas(self.fig)
@@ -70,7 +70,7 @@ class TrussDrawingWidget(QWidget):
         layout.addLayout(button_layout)
         layout.addWidget(self.canvas)
         self.setLayout(layout)
-        button_layout.addWidget(self.save_button)#增加结点杆件数据保存按钮
+        button_layout.addWidget(self.save_button)   #增加计算数据保存按钮
     def add_segment(self):
         # 获取用户输入
         start_x = float(self.start_x_input.text())
@@ -212,17 +212,6 @@ class TrussDrawingWidget(QWidget):
         if self.node_info_dialog.result() == QDialog.Accepted:
             self.draw_graph()
 
-    def save_info_to_txt(self, filename):
-        #增加结点杆件数据保存功能
-        with open(filename, 'w', encoding='utf-8') as f:
-            # 写入节点信息
-            f.write("Node Information:\n")
-            for coord, node_data in self.node_info_dict.items():
-                f.write(f"Node {node_data['index']}: Coord ({coord[0]}, {coord[1]}), Support Type: {node_data['support_type']}\n")    
-            # 写入杆件信息
-            f.write("\nSegment Information:\n")
-            for segment_data in self.segments_dict.values():
-                f.write(f"Segment {segment_data['segment_index']}: Start Node {segment_data['start_node_index']}, End Node {segment_data['end_node_index']}, Stiffness {segment_data['stiffness']}\n")
     class NodeInfoDialog(QDialog):
         def __init__(self, node_info_dict, segments_dict, parent=None):
             super().__init__(parent=parent)
@@ -342,6 +331,55 @@ class TrussDrawingWidget(QWidget):
 
             # 关闭对话框
             self.accept()
+
+
+    def calculate_segment_angle_and_length(self, segment_data):
+        start_x, start_y = segment_data["start_coord"]
+        end_x, end_y = segment_data["end_coord"]
+        dx = end_x - start_x
+        dy = end_y - start_y
+        length = math.sqrt(dx**2 + dy**2)
+        angle = math.degrees(math.atan2(dy, dx))
+        return angle, length
+
+    def calculate_node_displacements_and_forces(self):
+        # 这里需要一个结构分析算法来计算位移和受力
+        # 假设我们有一个简单的算法来计算这些值
+        # 例如，如果我们知道所有的荷载和边界条件，我们可以使用静力平衡方程
+        pass
+
+    def save_info_to_txt(self, filename):
+        # 计算杆件数和节点数
+        num_segments = len(self.segments_dict)
+        num_nodes = len(self.node_info_dict)
+
+        # 构建杆件信息行
+        segment_lines = []
+        for segment_data in self.segments_dict.values():
+            angle, length = self.calculate_segment_angle_and_length(segment_data)
+            start_node = segment_data['start_node_index']
+            end_node = segment_data['end_node_index']
+            segment_lines.append(f"{start_node} {end_node} {angle} {length}")
+
+        # 构建节点信息行
+        node_lines = []
+        # 假设我们已经通过某种方式计算了节点的位移和受力
+        node_displacements_forces = self.calculate_node_displacements_and_forces()
+        for node_data in self.node_info_dict.values():
+            node_index = node_data['index']
+            # force_x, force_y = 1, 1
+            # displacement_x, displacement_y, force_x, force_y = node_displacements_forces[node_index]
+            # node_lines.append(f"{displacement_x} {displacement_y} {force_x} {force_y}")
+
+        # 按照指定格式构建整个文本
+        text = f"{num_segments} {num_nodes}\n"
+        text += "\n".join(segment_lines) + "\n"
+        text += "\n".join(node_lines)
+
+        # 写入文件
+        with open(filename, 'w', encoding='utf-8') as f:
+            f.write(text)
+
 
 
 if __name__ == "__main__":
