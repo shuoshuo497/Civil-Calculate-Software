@@ -343,11 +343,32 @@ class TrussDrawingWidget(QWidget):
         return angle, length
 
     def calculate_node_displacements_and_forces(self):
-        # 这里需要一个结构分析算法来计算位移和受力
-        # 假设我们有一个简单的算法来计算这些值
-        # 例如，如果我们知道所有的荷载和边界条件，我们可以使用静力平衡方程
-        pass
+        # 计算节点的位移和受力
+        node_displacements_forces_dict= {}  # 存储节点位移和力的字典
+        # 假设我们有一个外部力字典，它给出了每个节点的力和方向 如下
+        external_forces = {1:('x1','y1'), 2:('x2', 'y2'), 3:(0,0), 4:('x4', 'y4')}
+        for node_data in self.node_info_dict.values():
+            node_index = node_data['index']
+            support_type = node_data['support_type']
+            if support_type == 'Pinned Support':    
+                displacement_x, displacement_y = 0, 0
+            else:
+            # 其他类型的支撑，这里需要根据实际的分析方法来计算位移
+            # 这里只是一个示例，实际情况可能需要更复杂的计算
+                displacement_x, displacement_y = 1, 1
+            def are_all_strings(tuple_values):      #检查元组中的所有元素是否都是字符串
+                return all(isinstance(value, str) for value in tuple_values)
+            if are_all_strings(external_forces[node_index]):
+                force_x = external_forces[node_index][0]
+                force_y = external_forces[node_index][1]
+            else:
+                force_x, force_y = external_forces[node_index]
 
+            force_x = external_forces[node_index][0]
+            force_y = external_forces[node_index][1]
+            node_displacements_forces_dict[node_index] = (displacement_x, displacement_y, force_x, force_y )
+        return node_displacements_forces_dict
+    
     def save_info_to_txt(self, filename):
         # 计算杆件数和节点数
         num_segments = len(self.segments_dict)
@@ -363,13 +384,11 @@ class TrussDrawingWidget(QWidget):
 
         # 构建节点信息行
         node_lines = []
-        # 假设我们已经通过某种方式计算了节点的位移和受力
         node_displacements_forces = self.calculate_node_displacements_and_forces()
         for node_data in self.node_info_dict.values():
             node_index = node_data['index']
-            # force_x, force_y = 1, 1
-            # displacement_x, displacement_y, force_x, force_y = node_displacements_forces[node_index]
-            # node_lines.append(f"{displacement_x} {displacement_y} {force_x} {force_y}")
+            displacement_x, displacement_y, force_x, force_y = node_displacements_forces[node_index]
+            node_lines.append(f"{displacement_x} {displacement_y} {force_x} {force_y}")
 
         # 按照指定格式构建整个文本
         text = f"{num_segments} {num_nodes}\n"
