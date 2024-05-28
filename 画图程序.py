@@ -190,7 +190,7 @@ class TrussDrawingWidget(QWidget):
         segment_data["mid_point"] = mid_point
 
     def draw_force(self, x, y, force_x, force_y):
-        arrow_length = 0.1  # 箭头的长度
+        arrow_length = 0.01  # 箭头的长度
         arrow_dx = force_x * arrow_length  # 水平力
         arrow_dy = force_y * arrow_length  # 竖直力
         self.ax.arrow(x, y, arrow_dx, arrow_dy, head_width=0.05, head_length=0.1, fc='r', ec='r')
