@@ -166,8 +166,8 @@ class TrussDrawingWidget(QWidget):
         for segment_data in self.segments_dict.values():
             self.draw_segment(segment_data)
         # 重新绘制所有力
-        for (node_x, node_y), force in self.force_dict.items():
-            self.draw_force(node_x, node_y, force)
+        for (node_x, node_y), (force_x, force_y) in self.force_dict.items():
+            self.draw_force(node_x, node_y, force_x, force_y)
         # 更新图形
         self.ax.axis('equal')
         self.ax.grid(True)
@@ -189,12 +189,12 @@ class TrussDrawingWidget(QWidget):
         segment_data["line"] = line
         segment_data["mid_point"] = mid_point
 
-    def draw_force(self, x, y, force):
+    def draw_force(self, x, y, force_x, force_y):
         arrow_length = 0.1  # 箭头的长度
-        arrow_dx = force * arrow_length * math.cos(math.radians(0))  # 假设力在x方向
-        arrow_dy = force * arrow_length * math.sin(math.radians(0))  # 假设力在x方向
+        arrow_dx = force_x * arrow_length  # 水平力
+        arrow_dy = force_y * arrow_length  # 竖直力
         self.ax.arrow(x, y, arrow_dx, arrow_dy, head_width=0.05, head_length=0.1, fc='r', ec='r')
-        self.ax.text(x + arrow_dx, y + arrow_dy, f'{force}N', color='red', fontsize=12)
+        self.ax.text(x + arrow_dx, y + arrow_dy, f'{force_x}N, {force_y}N', color='red', fontsize=12)
 
     def is_node_unused(self, coord):
         for segment in self.segments_dict.values():
@@ -238,7 +238,10 @@ class TrussDrawingWidget(QWidget):
         node_index, ok = QInputDialog.getInt(self, "Apply Force", "Enter node index:")
         if not ok:
             return
-        force, ok = QInputDialog.getDouble(self, "Apply Force", "Enter force magnitude (N):")
+        force_x, ok = QInputDialog.getDouble(self, "Apply Force", "Enter horizontal force (N):")
+        if not ok:
+            return
+        force_y, ok = QInputDialog.getDouble(self, "Apply Force", "Enter vertical force (N):")
         if not ok:
             return
 
@@ -253,7 +256,7 @@ class TrussDrawingWidget(QWidget):
             QMessageBox.warning(self, "Apply Force Failed", "Node index not found.")
             return
 
-        self.force_dict[node_coord] = force
+        self.force_dict[node_coord] = (force_x, force_y)
         self.draw_graph()
 
     def save_info_to_txt(self, filename):
@@ -269,8 +272,8 @@ class TrussDrawingWidget(QWidget):
                         f"End Coord: {segment_data['end_coord']}\n")
 
             f.write("\nForces:\n")
-            for (node_x, node_y), force in self.force_dict.items():
-                f.write(f"Node at ({node_x}, {node_y}): Force: {force} N\n")
+            for (node_x, node_y), (force_x, force_y) in self.force_dict.items():
+                f.write(f"Node at ({node_x}, {node_y}): Force: {force_x} N horizontal, {force_y} N vertical\n")
 
 
 class TrussAnalysisWidget(QWidget):
@@ -313,6 +316,9 @@ class MainWindow(QWidget):
         self.setLayout(layout)
         self.setWindowTitle("Truss Analysis Application")
         self.setGeometry(100, 100, 800, 600)
+
+    def save_info_to_txt(self, filename):
+        self.truss_widget.save_info_to_txt(filename)
 
 
 if __name__ == '__main__':
