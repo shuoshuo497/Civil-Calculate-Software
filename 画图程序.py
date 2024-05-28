@@ -27,8 +27,11 @@ class TrussDrawingWidget(QWidget):
         self.show_nodes_button.clicked.connect(self.show_nodes)
         self.show_segments_button = QPushButton("Show Segments")
         self.show_segments_button.clicked.connect(self.show_segments)
+        self.apply_force_button = QPushButton("Apply Force")  # 新增施加力按钮
+        self.apply_force_button.clicked.connect(self.apply_force_to_node)
         self.save_button = QPushButton("Save to TXT")   #将所需计算数据保存至txt文件
         self.save_button.clicked.connect(lambda: window.save_info_to_txt('计算数据.txt'))
+
         # 创建 Matplotlib 绘图窗口
         self.fig = Figure()
         self.canvas = FigureCanvas(self.fig)
@@ -45,6 +48,7 @@ class TrussDrawingWidget(QWidget):
         self.node_dict = {}
         self.segments_dict = {}
         self.node_info_dict = {}  # 记录结点信息的字典
+        self.force_dict = {}  # 记录节点施加的力
 
         # 设置布局
         layout = QVBoxLayout()
@@ -67,10 +71,12 @@ class TrussDrawingWidget(QWidget):
         button_layout = QHBoxLayout()
         button_layout.addWidget(self.show_nodes_button)
         button_layout.addWidget(self.show_segments_button)
+        button_layout.addWidget(self.apply_force_button)  # 将施加力按钮添加到布局中
         layout.addLayout(button_layout)
         layout.addWidget(self.canvas)
         self.setLayout(layout)
         button_layout.addWidget(self.save_button)   #增加计算数据保存按钮
+
     def add_segment(self):
         # 获取用户输入
         start_x = float(self.start_x_input.text())
@@ -97,7 +103,6 @@ class TrussDrawingWidget(QWidget):
             self.node_info_dict[(end_x, end_y)] = {'index': self.node_index, 'support_type': 'None'}
             end_node_index = self.node_index
             self.node_index += 1
-            print(end_node_index)
         else:
             end_node_index = self.node_dict[(end_x, end_y)]
 
@@ -135,21 +140,12 @@ class TrussDrawingWidget(QWidget):
         self.canvas.draw()
 
     def undo_segment(self):
-
         if self.segments_dict:
             last_segment_index = max(self.segments_dict.keys())
             last_segment = self.segments_dict.pop(last_segment_index)
             start_coord = last_segment["start_coord"]
             end_coord = last_segment["end_coord"]
             # 删除对应的线段和结点
-            print(self.node_info_dict)
-            print(self.node_dict)
-            # 更新线段序号
-            self.segment_index -= 1
-            del last_segment["line"]
-            del last_segment["mid_point"]
-            del last_segment["start_point"]
-            del last_segment["end_point"]
             if self.is_node_unused(start_coord):
                 del self.node_dict[start_coord]
                 del self.node_info_dict[start_coord]
@@ -158,13 +154,10 @@ class TrussDrawingWidget(QWidget):
                 del self.node_dict[end_coord]
                 del self.node_info_dict[end_coord]
 
-            print(self.node_info_dict)
-            print(self.node_dict)
             # 重新绘制图形
             self.draw_graph()
         else:
             QMessageBox.warning(self, "Undo Failed", "No segments to undo.")
-
 
     def draw_graph(self):
         # 清空画布
@@ -172,6 +165,9 @@ class TrussDrawingWidget(QWidget):
         # 重新绘制所有结点和线段
         for segment_data in self.segments_dict.values():
             self.draw_segment(segment_data)
+        # 重新绘制所有力
+        for (node_x, node_y), force in self.force_dict.items():
+            self.draw_force(node_x, node_y, force)
         # 更新图形
         self.ax.axis('equal')
         self.ax.grid(True)
@@ -189,219 +185,138 @@ class TrussDrawingWidget(QWidget):
         self.ax.text(start_x, start_y, str(segment_data["start_node_index"]), color='blue', fontsize=12, ha='right',
                      va='bottom')
         self.ax.plot(end_x, end_y, 'bo')  # 终点
-        self.ax.text(end_x, end_y, str(segment_data["end_node_index"]), color='blue', fontsize=12, ha='right',
-                     va='bottom')
+        self.ax.text(end_x, end_y, str(segment_data["end_node_index"]), color='blue', fontsize=12, ha='right', va='bottom')
+        segment_data["line"] = line
+        segment_data["mid_point"] = mid_point
+
+    def draw_force(self, x, y, force):
+        arrow_length = 0.1  # 箭头的长度
+        arrow_dx = force * arrow_length * math.cos(math.radians(0))  # 假设力在x方向
+        arrow_dy = force * arrow_length * math.sin(math.radians(0))  # 假设力在x方向
+        self.ax.arrow(x, y, arrow_dx, arrow_dy, head_width=0.05, head_length=0.1, fc='r', ec='r')
+        self.ax.text(x + arrow_dx, y + arrow_dy, f'{force}N', color='red', fontsize=12)
 
     def is_node_unused(self, coord):
-        for segment_data in self.segments_dict.values():
-            if segment_data["start_coord"] == coord or segment_data["end_coord"] == coord:
+        for segment in self.segments_dict.values():
+            if segment["start_coord"] == coord or segment["end_coord"] == coord:
                 return False
         return True
 
     def show_nodes(self):
-        # 创建结点信息对话框，并设置父对象为当前窗口
-        self.node_info_dialog = self.NodeInfoDialog(self.node_info_dict, self.segments_dict, parent=self)
-        self.node_info_dialog.exec_()
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Node Information")
+        layout = QVBoxLayout(dialog)
 
-    def show_segments(self):
-        # 创建显示线段信息的对话框
-        dialog = self.ShowSegmentsDialog(self.node_info_dict, self.segments_dict, parent=self)
+        table = QTableWidget(len(self.node_info_dict), 3)
+        table.setHorizontalHeaderLabels(["Node Index", "Coordinates", "Support Type"])
+        for i, ((x, y), info) in enumerate(self.node_info_dict.items()):
+            table.setItem(i, 0, QTableWidgetItem(str(info['index'])))
+            table.setItem(i, 1, QTableWidgetItem(f"({x}, {y})"))
+            table.setItem(i, 2, QTableWidgetItem(info['support_type']))
+        layout.addWidget(table)
+
+        dialog.setLayout(layout)
         dialog.exec_()
 
-    def node_dialog_closed(self):
-        if self.node_info_dialog.result() == QDialog.Accepted:
-            self.draw_graph()
+    def show_segments(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Segment Information")
+        layout = QVBoxLayout(dialog)
 
-    class NodeInfoDialog(QDialog):
-        def __init__(self, node_info_dict, segments_dict, parent=None):
-            super().__init__(parent=parent)
+        table = QTableWidget(len(self.segments_dict), 3)
+        table.setHorizontalHeaderLabels(["Segment Index", "Start Node", "End Node"])
+        for i, segment_data in enumerate(self.segments_dict.values()):
+            table.setItem(i, 0, QTableWidgetItem(str(segment_data["segment_index"])))
+            table.setItem(i, 1, QTableWidgetItem(str(segment_data["start_node_index"])))
+            table.setItem(i, 2, QTableWidgetItem(str(segment_data["end_node_index"])))
+        layout.addWidget(table)
 
-            self.node_info_dict = node_info_dict
-            self.segments_dict = segments_dict
+        dialog.setLayout(layout)
+        dialog.exec_()
 
-            self.setWindowTitle("Node Information")
-            self.layout = QVBoxLayout()
+    def apply_force_to_node(self):
+        node_index, ok = QInputDialog.getInt(self, "Apply Force", "Enter node index:")
+        if not ok:
+            return
+        force, ok = QInputDialog.getDouble(self, "Apply Force", "Enter force magnitude (N):")
+        if not ok:
+            return
 
-            # 创建结点信息表格
-            self.node_table = QTableWidget()
-            self.node_table.setColumnCount(4)  # 增加一个列用于选择承接条件
-            self.node_table.setHorizontalHeaderLabels(["Node Index", "X Coord", "Y Coord", "Support Type"])
-            self.layout.addWidget(self.node_table)
+        # 查找对应的节点坐标
+        node_coord = None
+        for coord, info in self.node_info_dict.items():
+            if info['index'] == node_index:
+                node_coord = coord
+                break
 
-            # 创建确认按钮
-            self.confirm_button = QPushButton("Confirm")
-            self.confirm_button.clicked.connect(self.confirm_support_type)
-            self.layout.addWidget(self.confirm_button)
+        if node_coord is None:
+            QMessageBox.warning(self, "Apply Force Failed", "Node index not found.")
+            return
 
-            self.setLayout(self.layout)
+        self.force_dict[node_coord] = force
+        self.draw_graph()
 
-            # 显示结点信息
-            self.show_node_info()
-
-        def show_node_info(self):
-
-            self.node_table.setRowCount(len(self.node_info_dict))
-            for i, (coord, node_data) in enumerate(self.node_info_dict.items()):
-                node_index = node_data['index']
-                x_coord, y_coord = coord
-                self.node_table.setItem(i, 0, QTableWidgetItem(str(node_index)))
-                self.node_table.setItem(i, 1, QTableWidgetItem(str(x_coord)))
-                self.node_table.setItem(i, 2, QTableWidgetItem(str(y_coord)))
-                # 创建下拉菜单
-                combo_box = QComboBox()
-                combo_box.addItem("No Support")
-                combo_box.addItem("Pinned Support")
-                combo_box.addItem("Sliding Support")
-                combo_box.addItem("Fixed Support")
-                support_type = node_data['support_type']
-                combo_box.setCurrentText(support_type)
-                self.node_table.setCellWidget(i, 3, combo_box)
-
-        def confirm_support_type(self):
-            for i in range(self.node_table.rowCount()):
-                node_index = int(self.node_table.item(i, 0).text())
-                print(node_index)
-                support_type = self.node_table.cellWidget(i, 3).currentText()
-                print(support_type)
-                # 更新结点支撑类型信息
-                for coord, node_data in self.node_info_dict.items():
-                    if node_data['index'] == node_index:
-                        node_data['support_type'] = support_type
-
-            self.parent().draw_graph()  # 在确认更新结点支撑类型后重新绘制图形
-
-            # 关闭对话框
-            self.accept()
-
-        def closeEvent(self, event):
-            self.parent().node_dialog_closed()
-            event.accept()
-    # 显示所有线段的表格
-    # 用来填写刚度
-    class ShowSegmentsDialog(QDialog):
-        def __init__(self, node_info_dict, segments_dict, parent=None):
-            super().__init__(parent=parent)
-
-            self.node_info_dict = node_info_dict
-            self.segments_dict = segments_dict
-
-
-            self.setWindowTitle("Segment Information")
-            self.layout = QVBoxLayout()
-
-            # 创建线段信息表格
-            self.segment_table = QTableWidget()
-            self.segment_table.setColumnCount(6)  # 6 列: 线段序号、起点、坐标、终点、坐标、刚度
-            self.segment_table.setHorizontalHeaderLabels(["Segment Index", "Start Node", "Start Coord",
-                                                          "End Node", "End Coord", "Stiffness"])
-            self.layout.addWidget(self.segment_table)
-
-            # 创建确认按钮
-            self.confirm_button = QPushButton("Confirm")
-            self.confirm_button.clicked.connect(self.confirm_stiffness)
-            self.layout.addWidget(self.confirm_button)
-
-            self.setLayout(self.layout)
-
-            # 显示线段信息
-            self.show_segment_info()
-
-        def show_segment_info(self):
-            self.segment_table.setRowCount(len(self.segments_dict))
-            for i, segment_data in enumerate(self.segments_dict.values()):
-                self.segment_table.setItem(i, 0, QTableWidgetItem(str(segment_data["segment_index"])))
-                self.segment_table.setItem(i, 1, QTableWidgetItem(str(segment_data["start_node_index"])))
-                self.segment_table.setItem(i, 2, QTableWidgetItem(str(segment_data["start_coord"])))
-                self.segment_table.setItem(i, 3, QTableWidgetItem(str(segment_data["end_node_index"])))
-                self.segment_table.setItem(i, 4, QTableWidgetItem(str(segment_data["end_coord"])))
-                self.segment_table.setItem(i, 5, QTableWidgetItem(str(segment_data["stiffness"])))
-
-        def confirm_stiffness(self):
-            for i in range(self.segment_table.rowCount()):
-                segment_index = int(self.segment_table.item(i, 0).text())
-                stiffness_item = float(self.segment_table.item(i, 5).text())
-                print(segment_index)
-                print(stiffness_item)
-                for index, segment_data in self.segments_dict.items():
-                    print(segment_data['stiffness'])
-                    if index == segment_index:
-                        segment_data['stiffness'] = stiffness_item
-
-            self.parent().draw_graph()  # 在确认更新结点支撑类型后重新绘制图形
-
-            # 关闭对话框
-            self.accept()
-
-
-    def calculate_segment_angle_and_length(self, segment_data):
-        start_x, start_y = segment_data["start_coord"]
-        end_x, end_y = segment_data["end_coord"]
-        dx = end_x - start_x
-        dy = end_y - start_y
-        length = math.sqrt(dx**2 + dy**2)
-        angle = math.degrees(math.atan2(dy, dx))
-        return angle, length
-
-    def calculate_node_displacements_and_forces(self):
-        # 计算节点的位移和受力
-        node_displacements_forces_dict= {}  # 存储节点位移和力的字典
-        # 假设我们有一个外部力字典，它给出了每个节点的力和方向 如下
-        external_forces = {1:('x1','y1'), 2:('x2', 'y2'), 3:(0,0), 4:('x4', 'y4')}
-        for node_data in self.node_info_dict.values():
-            node_index = node_data['index']
-            support_type = node_data['support_type']
-            if support_type == 'Pinned Support':    
-                displacement_x, displacement_y = 0, 0
-            else:
-            # 其他类型的支撑，这里需要根据实际的分析方法来计算位移
-            # 这里只是一个示例，实际情况可能需要更复杂的计算
-                displacement_x, displacement_y = 1, 1
-            def are_all_strings(tuple_values):      #检查元组中的所有元素是否都是字符串
-                return all(isinstance(value, str) for value in tuple_values)
-            if are_all_strings(external_forces[node_index]):
-                force_x = external_forces[node_index][0]
-                force_y = external_forces[node_index][1]
-            else:
-                force_x, force_y = external_forces[node_index]
-
-            force_x = external_forces[node_index][0]
-            force_y = external_forces[node_index][1]
-            node_displacements_forces_dict[node_index] = (displacement_x, displacement_y, force_x, force_y )
-        return node_displacements_forces_dict
-    
     def save_info_to_txt(self, filename):
-        # 计算杆件数和节点数
-        num_segments = len(self.segments_dict)
-        num_nodes = len(self.node_info_dict)
+        with open(filename, 'w') as f:
+            f.write("Nodes:\n")
+            for coord, info in self.node_info_dict.items():
+                f.write(f"Node {info['index']}: Coordinates: {coord}, Support Type: {info['support_type']}\n")
 
-        # 构建杆件信息行
-        segment_lines = []
-        for segment_data in self.segments_dict.values():
-            angle, length = self.calculate_segment_angle_and_length(segment_data)
-            start_node = segment_data['start_node_index']
-            end_node = segment_data['end_node_index']
-            segment_lines.append(f"{start_node} {end_node} {angle} {length}")
+            f.write("\nSegments:\n")
+            for segment_data in self.segments_dict.values():
+                f.write(f"Segment {segment_data['segment_index']}: Start Node: {segment_data['start_node_index']}, "
+                        f"End Node: {segment_data['end_node_index']}, Start Coord: {segment_data['start_coord']}, "
+                        f"End Coord: {segment_data['end_coord']}\n")
 
-        # 构建节点信息行
-        node_lines = []
-        node_displacements_forces = self.calculate_node_displacements_and_forces()
-        for node_data in self.node_info_dict.values():
-            node_index = node_data['index']
-            displacement_x, displacement_y, force_x, force_y = node_displacements_forces[node_index]
-            node_lines.append(f"{displacement_x} {displacement_y} {force_x} {force_y}")
+            f.write("\nForces:\n")
+            for (node_x, node_y), force in self.force_dict.items():
+                f.write(f"Node at ({node_x}, {node_y}): Force: {force} N\n")
 
-        # 按照指定格式构建整个文本
-        text = f"{num_segments} {num_nodes}\n"
-        text += "\n".join(segment_lines) + "\n"
-        text += "\n".join(node_lines)
 
-        # 写入文件
-        with open(filename, 'w', encoding='utf-8') as f:
-            f.write(text)
-        print("Saved already!")
-if __name__ == "__main__":
+class TrussAnalysisWidget(QWidget):
+    def __init__(self, truss_widget):
+        super().__init__()
+        self.truss_widget = truss_widget
+        self.initUI()
+
+    def initUI(self):
+        layout = QVBoxLayout()
+
+        self.combo_box = QComboBox(self)
+        self.combo_box.addItems(["Select an analysis type", "Type 1", "Type 2", "Type 3"])
+        layout.addWidget(self.combo_box)
+
+        self.setLayout(layout)
+
+        self.combo_box.currentIndexChanged.connect(self.on_combobox_changed)
+
+    def on_combobox_changed(self, index):
+        if index == 0:
+            return  # 忽略第一个选项
+        analysis_type = self.combo_box.itemText(index)
+        QMessageBox.information(self, "Analysis Selected", f"You selected {analysis_type} analysis.")
+
+
+class MainWindow(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.initUI()
+
+    def initUI(self):
+        self.truss_widget = TrussDrawingWidget()
+        self.analysis_widget = TrussAnalysisWidget(self.truss_widget)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.truss_widget)
+        layout.addWidget(self.analysis_widget)
+
+        self.setLayout(layout)
+        self.setWindowTitle("Truss Analysis Application")
+        self.setGeometry(100, 100, 800, 600)
+
+
+if __name__ == '__main__':
     app = QApplication(sys.argv)
-    window = TrussDrawingWidget()
-    window.setWindowTitle("Truss Drawing")
+    window = MainWindow()
     window.show()
     sys.exit(app.exec_())

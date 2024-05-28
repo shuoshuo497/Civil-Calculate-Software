@@ -6,7 +6,7 @@ from matplotlib.figure import Figure
 import math
 from numpy import *
 from math import *
-import sys,os,sympy,codecs
+import sys,os,codecs
 from PyQt5.QtCore import QProcess
 
 
@@ -414,7 +414,7 @@ class TrussDrawingWidget(QWidget):
         print("Saved already!")
     #计算部分
     def run_another_script(self):
-        script_path = "C:\\Users\\li_ju\\Desktop\\homework\\Civil-Calculate-Software\\计算程序.py"  # 替换为.py文件路径
+        script_path = "E:\\pycharm\\Civil-Calculate-Software\\计算程序.py"  # 替换为.py文件路径
         process = QProcess(self)
         process.startDetached("python", [script_path])
 
