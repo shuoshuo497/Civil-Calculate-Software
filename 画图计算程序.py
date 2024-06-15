@@ -56,8 +56,8 @@ class TrussDrawingWidget(QWidget):
         self.node_dict = {}       #node_dict是以坐标为key以结点编号为值
         self.segments_dict = {}
         self.node_info_dict = {}  #node_info_dict是以坐标为key记录结点信息的字典，每一个key对应的值为{'index': self.node_index, 'support_type': 'None'}
-        self.force_dict = {}  # 记录节点施加的力
-        
+        self.force_dict = {}  # 记录节点施加的力force_dict[node_coord] = (force_x, force_y)
+
         # 设置布局
         layout = QVBoxLayout()
         form_layout = QHBoxLayout()
@@ -187,6 +187,9 @@ class TrussDrawingWidget(QWidget):
         # 重新绘制所有结点和线段
         for segment_data in self.segments_dict.values():
             self.draw_segment(segment_data)
+        # 重新绘制所有力
+        for (node_x, node_y), (force_x, force_y) in self.force_dict.items():
+            self.draw_force(node_x, node_y, force_x, force_y)
         # 更新图形
         self.ax.axis('equal')
         self.ax.grid(True)
@@ -206,6 +209,13 @@ class TrussDrawingWidget(QWidget):
         self.ax.plot(end_x, end_y, 'bo')  # 终点
         self.ax.text(end_x, end_y, str(segment_data["end_node_index"]), color='blue', fontsize=12, ha='right',
                      va='bottom')
+        
+    def draw_force(self, x, y, force_x, force_y):
+        arrow_length = 0.1  # 箭头的长度
+        arrow_dx = force_x * arrow_length  # 水平力
+        arrow_dy = force_y * arrow_length  # 竖直力
+        self.ax.arrow(x, y, arrow_dx, arrow_dy, head_width=0.05, head_length=0.1, fc='r', ec='r')
+        self.ax.text(x + arrow_dx, y + arrow_dy, f'{force_x}N, {force_y}N', color='red', fontsize=12)
 
     def is_node_unused(self, coord):
         for segment_data in self.segments_dict.values():
@@ -244,6 +254,7 @@ class TrussDrawingWidget(QWidget):
             return
         self.force_dict[node_coord] = (force_x, force_y)
         self.draw_graph()
+        print(self.force_dict)
 
 
     def node_dialog_closed(self):
@@ -384,7 +395,10 @@ class TrussDrawingWidget(QWidget):
         # 计算节点的位移和受力
         node_displacements_forces_dict= {}  # 存储节点位移和力的字典
         # 假设我们有一个外部力字典，它给出了每个节点的力和方向 如下
-        external_forces = {1:('x1','y1'), 2:('x2', 'y2'), 3:(0,0), 4:('x4', 'y4')}
+        external_forces={1:(0,0), 3:(0,0), 4:(0, 0)}
+        for key, value in self.force_dict.items():
+            external_forces[self.node_dict[key]] = value
+        #external_forces = {1:('x1','y1'), 2:('x2', 'y2'), 3:(0,0), 4:('x4', 'y4')}
         for node_data in self.node_info_dict.values():
             node_index = node_data['index']
             support_type = node_data['support_type']
@@ -394,13 +408,13 @@ class TrussDrawingWidget(QWidget):
             # 其他类型的支撑，这里需要根据实际的分析方法来计算位移
             # 这里只是一个示例，实际情况可能需要更复杂的计算
                 displacement_x, displacement_y = 1, 1
-            def are_all_strings(tuple_values):      #检查元组中的所有元素是否都是字符串
-                return all(isinstance(value, str) for value in tuple_values)
-            if are_all_strings(external_forces[node_index]):
-                force_x = external_forces[node_index][0]
-                force_y = external_forces[node_index][1]
-            else:
-                force_x, force_y = external_forces[node_index]
+            # def are_all_strings(tuple_values):      #检查元组中的所有元素是否都是字符串
+            #     return all(isinstance(value, str) for value in tuple_values)
+            # if are_all_strings(external_forces[node_index]):
+            #     force_x = external_forces[node_index][0]
+            #     force_y = external_forces[node_index][1]
+            # else:
+            #     force_x, force_y = external_forces[node_index]
 
             force_x = external_forces[node_index][0]
             force_y = external_forces[node_index][1]
