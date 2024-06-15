@@ -1,36 +1,55 @@
 import tkinter as tk
-from tkinter import messagebox
+import  画图程序
+#from rod_assembler import open_rod_assembler_window
+import sys
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton
 
 
-# 假设您之前已经实现了以下两个函数
-def plot_node_coordinates():
-    # 这里是结点坐标作图的代码
-    messagebox.showinfo("节点坐标作图", "这里是结点坐标作图的功能")
+class MainWindow(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.init_ui()
 
+    def init_ui(self):
+        self.setWindowTitle("主界面")
+        self.setGeometry(100, 100, 300, 200)
 
-def assemble_rods():
-    # 这里是杆件拼装作图的代码
-    messagebox.showinfo("杆件拼装作图", "这里是杆件拼装作图的功能")
+        layout = QVBoxLayout()
 
+        self.btn_node_coordinates = QPushButton("结点坐标作图", self)
+        self.btn_node_coordinates.clicked.connect(self.open_truss_analysis)
+        layout.addWidget(self.btn_node_coordinates)
 
-# 创建主界面
-def create_main_window():
-    # 创建主窗口
-    root = tk.Tk()
-    root.title("主界面")
-    root.geometry("300x200")
+        self.btn_assemble_rods = QPushButton("杆件拼装作图", self)
+        self.btn_assemble_rods.clicked.connect(self.open_rod_assembly)
+        layout.addWidget(self.btn_assemble_rods)
 
-    # 创建并放置两个按钮
-    btn_node_coordinates = tk.Button(root, text="结点坐标作图", command=plot_node_coordinates)
-    btn_node_coordinates.pack(pady=20)
+        self.setLayout(layout)
 
-    btn_assemble_rods = tk.Button(root, text="杆件拼装作图", command=assemble_rods)
-    btn_assemble_rods.pack(pady=20)
+    def open_truss_analysis(self):
+        truss_widget = "Example Truss Widget"  # 这里可以传递实际需要的参数
+        self.truss_window = 画图程序.TrussAnalysisWidget(truss_widget)
+        self.truss_window.show()
 
-    # 运行主循环
-    root.mainloop()
+    def open_rod_assembly(self):
+        self.rod_window = QWidget()
+        self.rod_window.setWindowTitle("杆件拼装作图")
+        self.rod_window.setGeometry(150, 150, 400, 300)
 
+        layout = QVBoxLayout()
+        label = QLabel("这是一个临时的杆件拼装作图界面")
+        layout.addWidget(label)
 
-# 运行程序
+        self.rod_window.setLayout(layout)
+        self.rod_window.show()
+
+   # def open_rod_assembly(self):
+     #   rod_widget = "Example Rod Widget"  # 这里可以传递实际需要的参数
+    #    self.rod_window = RodAssemblyWidget(rod_widget)
+  #      self.rod_window.show()
+
 if __name__ == "__main__":
-    create_main_window()
+    app = QApplication(sys.argv)
+    main_window = MainWindow()
+    main_window.show()
+    sys.exit(app.exec_())
