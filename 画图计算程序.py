@@ -33,6 +33,8 @@ class TrussDrawingWidget(QWidget):
         self.show_nodes_button.clicked.connect(self.show_nodes)
         self.show_segments_button = QPushButton("Show Segments")
         self.show_segments_button.clicked.connect(self.show_segments)
+        self.apply_force_button = QPushButton("Apply Force")  # 新增施加力按钮
+        self.apply_force_button.clicked.connect(self.apply_force_to_node)
         self.save_button = QPushButton("Save to TXT")   #将所需计算数据保存至txt文件
         self.save_button.clicked.connect(self.save_info_to_txt)
         self.run_button = QPushButton("calculate")
@@ -54,7 +56,8 @@ class TrussDrawingWidget(QWidget):
         self.node_dict = {}       #node_dict是以坐标为key以结点编号为值
         self.segments_dict = {}
         self.node_info_dict = {}  #node_info_dict是以坐标为key记录结点信息的字典，每一个key对应的值为{'index': self.node_index, 'support_type': 'None'}
-
+        self.force_dict = {}  # 记录节点施加的力
+        
         # 设置布局
         layout = QVBoxLayout()
         form_layout = QHBoxLayout()
@@ -81,6 +84,8 @@ class TrussDrawingWidget(QWidget):
         self.setLayout(layout)
         button_layout.addWidget(self.save_button)   #增加计算数据保存按钮
         button_layout.addWidget(self.run_button) 
+        button_layout.addWidget(self.apply_force_button)  # 将施加力按钮添加到布局中
+
     def add_segment(self):
         # 获取用户输入
         start_x = float(self.start_x_input.text())
@@ -217,6 +222,29 @@ class TrussDrawingWidget(QWidget):
         # 创建显示线段信息的对话框
         dialog = self.ShowSegmentsDialog(self.node_info_dict, self.segments_dict, parent=self)
         dialog.exec_()
+
+    def apply_force_to_node(self):
+        node_index, ok = QInputDialog.getInt(self, "Apply Force", "Enter node index:")
+        if not ok:
+            return
+        force_x, ok = QInputDialog.getDouble(self, "Apply Force", "Enter horizontal force (N):")
+        if not ok:
+            return
+        force_y, ok = QInputDialog.getDouble(self, "Apply Force", "Enter vertical force (N):")
+        if not ok:
+            return
+        # 查找对应的节点坐标
+        node_coord = None
+        for coord, info in self.node_info_dict.items():
+            if info['index'] == node_index:
+                node_coord = coord
+                break
+        if node_coord is None:
+            QMessageBox.warning(self, "Apply Force Failed", "Node index not found.")
+            return
+        self.force_dict[node_coord] = (force_x, force_y)
+        self.draw_graph()
+
 
     def node_dialog_closed(self):
         if self.node_info_dialog.result() == QDialog.Accepted:
