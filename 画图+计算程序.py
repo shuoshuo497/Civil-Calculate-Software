@@ -34,7 +34,7 @@ class TrussDrawingWidget(QWidget):
         self.show_segments_button = QPushButton("Show Segments")
         self.show_segments_button.clicked.connect(self.show_segments)
         self.save_button = QPushButton("Save to TXT")   #将所需计算数据保存至txt文件
-        self.save_button.clicked.connect(lambda: window.save_info_to_txt('计算数据.txt'))
+        self.save_button.clicked.connect(self.save_info_to_txt)
         self.run_button = QPushButton("calculate")
         self.run_button.clicked.connect(self.run_another_script)
  
@@ -379,7 +379,7 @@ class TrussDrawingWidget(QWidget):
             node_displacements_forces_dict[node_index] = (displacement_x, displacement_y, force_x, force_y )
         return node_displacements_forces_dict
     
-    def save_info_to_txt(self, filename):
+    def save_info_to_txt(self):
         # 计算杆件数和节点数
         num_segments = len(self.segments_dict)
         num_nodes = len(self.node_info_dict)
@@ -406,6 +406,7 @@ class TrussDrawingWidget(QWidget):
         text += "\n".join(node_lines)
 
         # 写入文件
+        filename='计算数据.txt'
         with open(filename, 'w', encoding='utf-8') as f:
             f.write(text)
         print("Saved already!")
