@@ -1,8 +1,6 @@
-import tkinter as tk
-import  画图程序
-#from rod_assembler import open_rod_assembler_window
 import sys
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel
+from 画图程序 import TrussDrawingWidget  # 导入正确的结点坐标绘图类
 
 
 class MainWindow(QWidget):
@@ -17,7 +15,7 @@ class MainWindow(QWidget):
         layout = QVBoxLayout()
 
         self.btn_node_coordinates = QPushButton("结点坐标作图", self)
-        self.btn_node_coordinates.clicked.connect(self.open_truss_analysis)
+        self.btn_node_coordinates.clicked.connect(self.open_truss_drawing)
         layout.addWidget(self.btn_node_coordinates)
 
         self.btn_assemble_rods = QPushButton("杆件拼装作图", self)
@@ -26,10 +24,9 @@ class MainWindow(QWidget):
 
         self.setLayout(layout)
 
-    def open_truss_analysis(self):
-        truss_widget = "Example Truss Widget"  # 这里可以传递实际需要的参数
-        self.truss_window = 画图程序.TrussAnalysisWidget(truss_widget)
-        self.truss_window.show()
+    def open_truss_drawing(self):
+        self.truss_drawing_window = TrussDrawingWidget()
+        self.truss_drawing_window.show()
 
     def open_rod_assembly(self):
         self.rod_window = QWidget()
@@ -43,10 +40,6 @@ class MainWindow(QWidget):
         self.rod_window.setLayout(layout)
         self.rod_window.show()
 
-   # def open_rod_assembly(self):
-     #   rod_widget = "Example Rod Widget"  # 这里可以传递实际需要的参数
-    #    self.rod_window = RodAssemblyWidget(rod_widget)
-  #      self.rod_window.show()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
