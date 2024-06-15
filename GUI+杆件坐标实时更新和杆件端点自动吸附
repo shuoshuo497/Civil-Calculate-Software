@@ -1,0 +1,935 @@
+import sys
+from PySide2 import QtWidgets, QtGui, QtCore
+from PySide2.QtCore import Qt
+import qtawesome as qta
+import json
+import math
+
+PIC_LIST = [
+    'hinged_support', 'hold-down_support',
+    'movable_hinged_support', 'sliding_support'
+]
+
+
+class Item:
+    def keyPressEvent(self, e): #实现键盘微动调整
+        old_pos = self.pos()
+
+        if e.key() == Qt.Key_Up:
+            self.setPos(self.x(), self.y() - 1)
+        elif e.key() == Qt.Key_Down:
+            self.setPos(self.x(), self.y() + 1)
+        elif e.key() == Qt.Key_Left:
+            self.setPos(self.x() - 1, self.y())
+        elif e.key() == Qt.Key_Right:
+            self.setPos(self.x() + 1, self.y())
+
+        if old_pos != self.pos() and isinstance(self, LineItem):
+            self.updateLineProps()
+
+    def itemChange(self, change, value, ): #实现属性表导入props内容
+        # 被选中
+        if change == QtWidgets.QGraphicsItem.ItemSelectedChange and value == True:
+            # 设置属性框内容
+            window.setPropTable(self.props)
+
+
+        return super().itemChange(change, value)
+
+    def mouseReleaseEvent(self, event):
+        super(Item, self).mouseReleaseEvent(event)  # 正确使用 super
+        if isinstance(self, LineItem) :
+            # 这里处理线条的属性更新
+            #print(self.props["起点坐标"])
+            self.deleteEndpoints()
+            print(self.endpoints)
+
+            self.alignToClosestEndpoint()
+            #self.updateEndpoints()
+            print(self.endpoints)
+
+
+
+
+
+
+
+
+    def toSaveData(self):
+        pos = self.pos()
+        return {
+            'type': self.__class__.__name__,
+            'pos': [pos.x(), pos.y()],
+            'props': self.props
+        }
+
+#支座控件（图片格式）
+class PictureItem(Item, QtWidgets.QGraphicsItemGroup):
+    def __init__(self, pic=None, text=None):
+        super().__init__()
+
+        # 从文件加载
+        if pic is None:
+            return #跳过下面代码对pic和text的初始化
+
+        self.pic = pic
+        self.oriPixmap = QtGui.QPixmap(f'./support_images/{pic}.png')
+        pixmap = self.oriPixmap.scaledToWidth(100, Qt.SmoothTransformation)
+
+        self.picItem = QtWidgets.QGraphicsPixmapItem(pixmap)
+        self.picItem.setPos(0, 0)  # 设置其在parent的显示位置
+
+        self.textItem = QtWidgets.QGraphicsTextItem()
+        self.textItem.setTextWidth(200)
+        self.textItem.setPlainText(text)
+        self.textItem.setPos(100, 50)  # 设置其在parent的显示位置
+
+        # 添加子item到组item中
+        self.addToGroup(self.picItem)
+        self.addToGroup(self.textItem)
+
+        self.props = {
+            '图标位置': '0,0',
+            '图标宽度': '100',
+            '文字内容': text,
+            '文字位置': '100,50',
+            '文字宽度': '200',
+            'zValue': '0.0',
+        }
+
+    def loadData(self, data):
+        # 设置props
+        self.props = data["props"]
+        props = self.props
+        self.setZValue(float(props["zValue"]))
+
+        # 其他设置
+        self.pic = data["pic"]
+        self.oriPixmap = QtGui.QPixmap(f'./images/{self.pic}.png')
+        pixmap = self.oriPixmap.scaledToWidth(int(props['图标宽度']), Qt.SmoothTransformation)
+
+        self.picItem = QtWidgets.QGraphicsPixmapItem(pixmap)
+        self.picItem.setPos(*[int(p) for p in props['图标位置'].split(',')])
+
+        self.textItem = QtWidgets.QGraphicsTextItem()
+        self.textItem.setTextWidth(float(props['文字宽度']))
+        self.textItem.setPlainText(props['文字内容'])
+        self.textItem.setPos(*[int(p) for p in props['文字位置'].split(',')])  # 设置其在parent的显示位置
+
+        # 添加子item到组item中
+        self.addToGroup(self.picItem)
+        self.addToGroup(self.textItem)
+
+        self.setPos(*data["pos"])
+
+    def itemPropChanged(self, cfgName, cfgValue: str):
+        self.props[cfgName] = cfgValue
+
+        if cfgName == '图标位置':
+            self.picItem.setPos(*[int(p) for p in cfgValue.split(',')])
+            self.removeFromGroup(self.picItem)
+            self.addToGroup(self.picItem)
+
+        elif cfgName == '图标宽度':
+            pixmap = self.oriPixmap.scaledToWidth(int(cfgValue), Qt.SmoothTransformation)
+            self.picItem.setPixmap(pixmap)
+
+            self.removeFromGroup(self.picItem)
+            self.addToGroup(self.picItem)
+
+        elif cfgName == '文字内容':
+            self.textItem.setPlainText(cfgValue)
+
+            self.removeFromGroup(self.picItem)
+            self.addToGroup(self.picItem)
+
+
+        elif cfgName == '文字位置':
+            self.textItem.setPos(*[int(p) for p in cfgValue.split(',')])
+
+            self.removeFromGroup(self.picItem)
+            self.addToGroup(self.picItem)
+
+
+        elif cfgName == '文字宽度':
+            self.textItem.setTextWidth(float(cfgValue))
+
+            self.removeFromGroup(self.picItem)
+            self.addToGroup(self.picItem)
+
+        elif cfgName == 'zValue':
+            self.setZValue(float(cfgValue))
+
+        else:
+            return
+
+    def toSaveData(self):
+
+        data = super().toSaveData() #取代Item类下的toSaveData
+        data['pic'] = self.pic
+
+        return data
+
+class RectItem(Item, QtWidgets.QGraphicsRectItem):
+    def __init__(self, *args):
+        super().__init__(*args)
+
+        self.props = {
+            '矩形宽度': '200',
+            '矩形高度': '100',
+            '填充颜色': '222, 241, 255, 0',
+            '线条宽度': '1',
+            '线条颜色': '0, 0, 0',
+            'zValue': '0.0',
+        }
+
+
+
+    def loadData(self, data):
+        # 设置props
+        self.props = data["props"]
+        props = self.props
+        self.setPos(*data["pos"])
+        self.setZValue(float(props["zValue"]))
+
+        # 其他设置
+        qrf = self.rect()
+        qrf.setWidth(float(props["矩形宽度"]))
+        qrf.setHeight(float(props["矩形高度"]))
+        self.setRect(qrf)
+
+        color = QtGui.QColor(*[int(v) for v in props["填充颜色"].replace(' ', '').split(',')])
+        self.setBrush(QtGui.QBrush(color))
+
+        pen = self.pen()
+        pen.setWidth(int(props["线条宽度"]))
+        pen.setColor(QtGui.QColor(*[int(v) for v in props["线条颜色"].replace(' ', '').split(',')]))
+        self.setPen(pen)
+
+    def itemPropChanged(self, cfgName, cfgValue: str):
+        self.props[cfgName] = cfgValue
+
+        if cfgName == '矩形宽度':
+            qrf = self.rect()
+            qrf.setWidth(float(cfgValue))
+            self.setRect(qrf)  # 重新设定
+
+        elif cfgName == '矩形高度':
+            qrf = self.rect()
+            qrf.setHeight(float(cfgValue))
+            self.setRect(qrf)  # 重新设定
+
+        elif cfgName == '填充颜色':
+            color = QtGui.QColor(*[int(v) for v in cfgValue.replace(' ', '').split(',')])
+            self.setBrush(QtGui.QBrush(color))
+
+
+        elif cfgName == '线条颜色':
+            pen = self.pen()
+            color = QtGui.QColor(*[int(v) for v in cfgValue.replace(' ', '').split(',')])
+            pen.setColor(color)
+            self.setPen(pen)
+
+
+        elif cfgName == '线条宽度':
+            pen = self.pen()
+            pen.setWidth(int(cfgValue))
+            self.setPen(pen)
+
+        elif cfgName == 'zValue':
+            self.setZValue(float(cfgValue))
+
+        else:
+            return
+
+
+class EllipseItem(Item, QtWidgets.QGraphicsEllipseItem):
+    def __init__(self, *args):
+        super().__init__(*args)
+
+        self.props = {
+            '椭圆宽度': '200',
+            '椭圆高度': '100',
+            '填充颜色': '222, 241, 255, 0',
+            '线条宽度': '1',
+            '线条颜色': '0, 0, 0',
+            'zValue': '0.0',
+        }
+
+    def loadData(self, data):
+        # 设置props
+        self.props = data["props"]
+        props = self.props
+        self.setPos(*data["pos"])
+        self.setZValue(float(props["zValue"]))
+
+        # 其他设置
+        qrf = self.rect()
+        qrf.setWidth(float(props["椭圆宽度"]))
+        qrf.setHeight(float(props["椭圆高度"]))
+        self.setRect(qrf)
+
+        color = QtGui.QColor(*[int(v) for v in props["填充颜色"].replace(' ', '').split(',')])
+        self.setBrush(QtGui.QBrush(color))
+
+        pen = self.pen()
+        pen.setWidth(int(props["线条宽度"]))
+        pen.setColor(QtGui.QColor(*[int(v) for v in props["线条颜色"].replace(' ', '').split(',')]))
+        self.setPen(pen)
+
+    def itemPropChanged(self, cfgName, cfgValue: str):
+        self.props[cfgName] = cfgValue
+
+        if cfgName == '椭圆宽度':
+            qrf = self.rect()
+            qrf.setWidth(float(cfgValue))
+            self.setRect(qrf)  # 重新设定
+
+        elif cfgName == '椭圆高度':
+            qrf = self.rect()
+            qrf.setHeight(float(cfgValue))
+            self.setRect(qrf)  # 重新设定
+
+        elif cfgName == '填充颜色':
+            color = QtGui.QColor(*[int(v) for v in cfgValue.replace(' ', '').split(',')])
+            self.setBrush(QtGui.QBrush(color))
+
+
+        elif cfgName == '线条颜色':
+            pen = self.pen()
+            color = QtGui.QColor(*[int(v) for v in cfgValue.replace(' ', '').split(',')])
+            pen.setColor(color)
+            self.setPen(pen)
+
+
+        elif cfgName == '线条宽度':
+            pen = self.pen()
+            pen.setWidth(int(cfgValue))
+            self.setPen(pen)
+
+        elif cfgName == 'zValue':
+            self.setZValue(float(cfgValue))
+
+        else:
+            return
+
+
+class LineItem(Item, QtWidgets.QGraphicsLineItem):
+    endpoints = []
+
+    def __init__(self, *args): #*args为可变参数
+        super().__init__(*args)
+
+        self.props = {
+            '线宽': '1',
+            '颜色': '0, 0, 0',
+            '线长': '200',
+            '旋转角度': '0',
+            '起点坐标': '0, 0',
+            '终点坐标': '200,0',
+            'zValue': '0.0',
+        } #只是作为属性表的显示内容
+        self.initial_placement = True  # 初始放置标志
+
+    def loadData(self, data):
+        # 设置props
+        self.props = data["props"]
+        props = self.props
+        self.setPos(*data["pos"])
+        self.setZValue(float(props["zValue"]))
+
+        # 其他设置
+
+        pen = self.pen()
+        pen.setWidth(int(props["线宽"]))
+        pen.setColor(QtGui.QColor(*[int(v) for v in props["颜色"].replace(' ', '').split(',')]))
+        self.setPen(pen)
+
+        line = self.line()
+        self.setLine(float(props["起点坐标"].split(",")[0].strip()),
+                     float(props["起点坐标"].split(",")[1].strip()),
+                     float(props["终点坐标"].split(",")[0].strip()),
+                     float(props["终点坐标"].split(",")[1].strip()), )
+
+    def itemPropChanged(self, cfgName, cfgValue: str):
+        self.props[cfgName] = cfgValue
+
+        if cfgName == '线宽':
+            pen = self.pen()
+            pen.setWidth(int(cfgValue))
+            self.setPen(pen)
+
+        elif cfgName == '颜色':
+            pen = self.pen()
+            color = QtGui.QColor(*[int(v) for v in cfgValue.replace(' ', '').split(',')])
+            pen.setColor(color)
+            self.setPen(pen)
+
+
+        elif cfgName == '线长':
+            line = self.line()
+            line.setLength(float(cfgValue))
+            self.setLine(line)
+
+            angle_rad = math.atan2(line.y2() - line.y1(), line.x2() - line.x1())
+            new_end_x = float(self.props['起点坐标'].split(',')[0].strip()) + math.cos(angle_rad) * float(cfgValue)
+            new_end_y = float(self.props['起点坐标'].split(',')[1].strip()) + math.sin(angle_rad) * float(cfgValue)
+
+
+            self.props['终点坐标'] = f"{new_end_x}, {new_end_y}"
+
+            window.setPropTable(self.props)
+
+        elif cfgName == '旋转角度':
+            line = self.line()
+            line.setAngle(float(cfgValue))
+            self.setLine(line)
+
+            angle_rad = math.radians(float(cfgValue))
+            length = math.hypot(line.x2() - line.x1(), line.y2() - line.y1())  # 计算线长
+            new_end_x = self.pos().x() + math.cos(angle_rad) * length
+            new_end_y = self.pos().y() + math.sin(angle_rad) * length
+            self.props['起点坐标'] = f"{self.pos().x()}, {self.pos().y()}"
+            self.props['终点坐标'] = f"{new_end_x}, {new_end_y}"
+
+            window.setPropTable(self.props)
+
+
+        elif cfgName == '起点坐标':
+            line = self.line()
+            # 解析起点坐标
+            start_coords = cfgValue.split(',')
+            global_start_x = float(start_coords[0].strip())
+            global_start_y = float(start_coords[1].strip())
+
+            local_start_x = global_start_x - self.pos().x()
+            local_start_y = global_start_y - self.pos().y()
+            # 获取当前的结束点坐标
+            local_end_x = line.x2()
+            local_end_y = line.y2()
+
+            self.setLine(local_start_x, local_start_y, local_end_x, local_end_y)
+
+
+        elif cfgName == '终点坐标':
+            line = self.line()
+
+            end_coords = cfgValue.split(',')
+            global_end_x = float(end_coords[0].strip())
+            global_end_y = float(end_coords[1].strip())
+
+            # 转换为局部坐标
+            local_end_x = global_end_x - self.pos().x()
+            local_end_y = global_end_y - self.pos().y()
+
+            # 获取当前的起点坐标（局部坐标），并保持不变
+            local_start_x = self.line().x1()
+            local_start_y = self.line().y1()
+
+
+            self.setLine(local_start_x, local_start_y, local_end_x, local_end_y)
+
+        elif cfgName == 'zValue':
+            self.setZValue(float(cfgValue))
+
+        else:
+            return
+
+    def stringToPointF(self, coord_string):
+        coords = coord_string.split(',')
+        x = float(coords[0])
+        y = float(coords[1])
+        return QtCore.QPointF(x, y)
+
+    def deleteEndpoints(self):
+        line = self.line()
+
+        origin_pos1 = self.stringToPointF(self.props['起点坐标'])
+        origin_pos2 = self.stringToPointF(self.props['终点坐标'])
+        origin_list = [origin_pos1, origin_pos2]
+        for point in origin_list:
+            if point in self.endpoints:
+                self.endpoints.remove(point)
+
+    def updateEndpoints(self):
+        line = self.line()
+        new_pos1 = self.mapToScene(line.p1())
+        new_pos2 = self.mapToScene(line.p2())
+
+        current_endpoints = [new_pos1, new_pos2]
+        self.endpoints.extend(current_endpoints)
+
+    def alignToClosestEndpoint(self):
+        threshold = 30  # 定义对齐的距离阈值
+        current_start = self.mapToScene(self.line().p1())
+        current_end = self.mapToScene(self.line().p2())
+
+        adjusted = False
+
+        for point in self.endpoints:
+            start_distance = (current_start - point).manhattanLength()
+            end_distance = (current_end - point).manhattanLength()
+
+            new_start = None
+            new_end = None
+
+            # 检查起点是否近于任何端点
+            if start_distance < threshold:
+                adjusted = True
+                translation_vector = point - current_start
+                new_start = point
+                new_end = current_end + translation_vector  # 移动终点保持线长和方向
+
+
+            # 检查终点是否近于任何端点
+            if end_distance < threshold:
+                adjusted = True
+                translation_vector = point - current_end
+                new_end = point
+                new_start = current_start + translation_vector  # 移动起点保持线长和方向
+
+            if adjusted:
+                # 将坐标转换回本地坐标系并设置线条
+                local_new_start = self.mapFromScene(new_start)
+                local_new_end = self.mapFromScene(new_end)
+                self.setLine(QtCore.QLineF(local_new_start, local_new_end))
+                break
+
+
+        self.updateEndpoints()  # 更新端点坐标
+        self.updateLineProps()
+    def updateLineProps(self):
+        # 假设有一个 line 方法返回 QLineF 对象
+        line = self.line()
+        self.props['起点坐标'] = f"{self.pos().x() + line.x1()}, {self.pos().y() + line.y1()}"
+        self.props['终点坐标'] = f"{self.pos().x() + line.x2()}, {self.pos().y() + line.y2()}"
+        # 假设有一个方法更新 UI
+        window.setPropTable(self.props)
+
+
+class TextItem(Item, QtWidgets.QGraphicsTextItem):
+    html_templt = '''<div style='color:$color$;
+                font-size:$size$px;
+                font-weight:$weight$;
+                font-family:$font$;
+                '>$content$</div>'''
+
+    def __init__(self, *args):
+        super().__init__(*args)
+
+        self.props = {
+            '内容': '文字内容',
+            '颜色': 'black',
+            '大小': '18',
+            '字体': 'fangsong',
+            '字粗': '200',
+            'zValue': '0.0',
+        }
+
+    def loadData(self, data):
+        # 设置props
+        self.props = data["props"]
+        props = self.props
+        self.setPos(*data["pos"])
+        self.setZValue(float(props["zValue"]))
+
+        # 其他设置
+
+        html = self.html_templt.replace('$content$', self.props['内容'])
+        html = html.replace('$color$', self.props['颜色'])
+        html = html.replace('$size$', self.props['大小'])
+        html = html.replace('$font$', self.props['字体'])
+        html = html.replace('$weight$', self.props['字粗'])
+
+        self.setHtml(html)
+
+    def itemPropChanged(self, cfgName, cfgValue: str):
+        self.props[cfgName] = cfgValue
+
+        if cfgName == 'zValue':
+            self.setZValue(float(cfgValue))
+
+        else:
+
+            html = self.html_templt.replace('$content$', self.props['内容'])
+            html = html.replace('$color$', self.props['颜色'])
+            html = html.replace('$size$', self.props['大小'])
+            html = html.replace('$font$', self.props['字体'])
+            html = html.replace('$weight$', self.props['字粗'])
+
+            self.setHtml(html)
+class DragLabel(QtWidgets.QLabel):
+
+    def mouseMoveEvent(self, e):
+
+        if e.buttons() != Qt.LeftButton:
+            return
+
+        mimeData = QtCore.QMimeData()
+
+        drag = QtGui.QDrag(self)
+        drag.setMimeData(mimeData)
+
+        drag.exec_(Qt.MoveAction)
+
+
+class DnDGraphicView(QtWidgets.QGraphicsView):
+
+    def __init__(self, *args):
+        super().__init__(*args)
+        self.lastDropItem = None
+
+    def dragMoveEvent(self, e):
+        pass
+
+    def dragEnterEvent(self, e):
+        src = e.source()
+        if hasattr(src, 'dndinfo'):
+            e.accept()
+        else:
+            e.ignore()
+
+    def dropEvent(self, e):
+
+        name = e.source().dndinfo['name']
+        # print(name)
+        if name == '矩形':
+            item = RectItem(0, 0, 200, 100)
+        elif name == '椭圆':
+            item = EllipseItem(0, 0, 200, 100)
+        elif name == '线条':
+            item = LineItem(0, 0, 200, 0)
+        elif name == '文字':
+            item = TextItem("请输入文字内容")
+
+        else:
+            item = PictureItem(name, name)
+
+        self.scene().addItem(item)
+
+        # 设置一些属性
+        item.setPos(e.pos())
+        if name == '线条':
+            global_start_x = e.pos().x()
+            global_start_y = e.pos().y()
+            global_end_x = e.pos().x() + 200  # 假定线的长度为200单位
+            global_end_y = e.pos().y()
+
+            item.props['起点坐标'] = f"{global_start_x}, {global_start_y}"
+            item.props['终点坐标'] = f"{global_end_x}, {global_end_y}"
+
+
+            item.updateEndpoints()
+            print(item.endpoints)
+
+
+        # 设置item可以移动
+        item.setFlag(QtWidgets.QGraphicsItem.ItemIsMovable, True)
+        # 设置item可以选中
+        item.setFlag(QtWidgets.QGraphicsItem.ItemIsSelectable, True)
+        # 设置item可以聚焦，这样才会有键盘按键回调keyPressEvent
+        item.setFlag(QtWidgets.QGraphicsItem.ItemIsFocusable, True)
+
+        # 设置为选中
+        if self.lastDropItem:
+            try:
+                self.lastDropItem.setSelected(False)
+            except:
+                pass
+        item.setSelected(True)
+        self.lastDropItem = item
+
+    # 该方法使得view 改变大小时（比如拖拽主窗口resize）， scene大小跟着变化
+    # 否则，view和secen大小不一致， 拖放item 时，位置就不对了。
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        size = event.size()
+        self.setSceneRect(0, 0, size.width(), size.height())
+
+
+
+class DrawingWidget(QtWidgets.QMainWindow):
+
+    def __init__(self):
+        super().__init__()
+        self.resize(1500, 1000)
+
+        # central Widget
+        centralWidget = QtWidgets.QWidget(self)
+        self.setCentralWidget(centralWidget)
+
+        # central Widget 里面的 主 layout
+        self.mainLayout = QtWidgets.QHBoxLayout(centralWidget)
+
+        # 左边区
+        self.setupLeftPane()
+
+        # 参数 Qt.Vertical 是垂直分裂， Qt.Horizontal是水平分裂
+        self.splitter = QtWidgets.QSplitter(Qt.Horizontal) #创建一个水平分裂器
+        self.mainLayout.addWidget(self.splitter)
+
+        # 中间绘制区
+        self.setupCanvas()
+        self.splitter.insertWidget(0, self.view)
+
+        # 右边区
+        self.setupRightPane()
+
+        # 设置每个部分的宽度，单位是像素
+        self.splitter.setSizes([600, 250])
+
+        self.setupToolBar()
+
+    def setupToolBar(self):
+
+        # 创建 工具栏 对象 并添加
+        toolbar = QtWidgets.QToolBar(self)
+        self.addToolBar(toolbar)
+
+        # 添加 工具栏 条目Action
+        actionSave = toolbar.addAction(qta.icon("ph.download-simple", color='green'), "保存")
+        actionSave.triggered.connect(self.save)
+
+        actionLoad = toolbar.addAction(qta.icon("ph.upload-simple", color='green'), "加载")
+        actionLoad.triggered.connect(self.load)
+
+        actionDelItem = toolbar.addAction(qta.icon("ph.x-square", color='green'), "删除")
+        actionDelItem.triggered.connect(self.delItem)
+
+        actionDelAllItem = toolbar.addAction(qta.icon("ph.trash", color='green'), "清空")
+        actionDelAllItem.triggered.connect(self.delAllItems)
+
+    def load(self):
+        with open('cfg.json', 'r', encoding='utf8') as f:
+            content = f.read()
+
+        data = json.loads(content)
+
+        for itemData in data:
+            typeName = itemData["type"]
+
+            theClass = globals()[typeName] #laod之后确定元素的类
+            item = theClass()
+            item.loadData(itemData)
+            self.scene.addItem(item)
+
+            # 设置item可以移动
+            item.setFlag(QtWidgets.QGraphicsItem.ItemIsMovable, True)
+            # 设置item可以选中
+            item.setFlag(QtWidgets.QGraphicsItem.ItemIsSelectable, True)
+            # 设置item可以聚焦，这样才会有键盘按键回调keyPressEvent
+            item.setFlag(QtWidgets.QGraphicsItem.ItemIsFocusable, True)
+
+    def save(self):
+        itemSaveDataList = []
+        for item in self.scene.items():
+            print(item)
+            if hasattr(item, 'toSaveData'):
+                saveData = item.toSaveData()
+                itemSaveDataList.append(saveData)
+
+        print(itemSaveDataList)
+
+        content = json.dumps(itemSaveDataList, indent=2, ensure_ascii=False)
+        with open('cfg.json', 'w', encoding='utf8') as f:
+            f.write(content)
+
+    def delItem(self):
+        items = self.scene.selectedItems() #当前选中的元素
+        for item in items:
+            self.scene.removeItem(item)
+
+    def delAllItems(self):
+        self.scene.clear()
+
+
+    def setupLeftPane(self):
+        leftLayout = QtWidgets.QVBoxLayout()
+        self.mainLayout.addLayout(leftLayout)
+
+        #支座图片
+        pixmapLayout = QtWidgets.QGridLayout()
+        leftLayout.addLayout(pixmapLayout)
+        leftLayout.addStretch()
+
+        row, col = 0, 0
+        for picName in PIC_LIST:
+
+            # 初始参数就是图片路径名
+            pixmap = QtGui.QPixmap(f'./support_images/{picName}.png')
+            # 设定图片缩放大小，这里是50个像素的宽度，高度也会等比例缩放
+            pixmap = pixmap.scaledToWidth(70, Qt.SmoothTransformation)
+
+            label = DragLabel()
+            label.setToolTip(picName)
+            label.dndinfo = {'name': picName}
+
+            # 设置label显示的pixmap
+            label.setPixmap(pixmap)
+
+            pixmapLayout.addWidget(label, row, col)
+
+            if col == 1:
+                row += 1
+                col = 0
+            else:
+                col += 1
+
+        # 杆件
+        basicItemLayout = QtWidgets.QGridLayout()
+        leftLayout.addLayout(basicItemLayout)
+
+        row, col = 0, 0
+        BASICITEM_LIST = ['矩形', '线条', '椭圆', '文字']
+
+        for name in BASICITEM_LIST:
+
+            label = DragLabel(name)
+            label.setToolTip(name)
+            label.setStyleSheet("background-color:#fff;color:#798699;font-weight: bold;")
+            label.setFixedSize(140, 50)
+            label.setAlignment(Qt.AlignCenter)
+            label.dndinfo = {'name': name}
+
+            basicItemLayout.addWidget(label, row, col)  # 添加到第1行，第1列
+
+
+            row += 1
+
+        leftLayout.addStretch()
+
+    def setupCanvas(self):
+        self.scene = QtWidgets.QGraphicsScene(0, 0, 800, 600)
+        self.view = DnDGraphicView(self.scene)
+        #self.mainLayout.addWidget(self.view)
+
+    def setupRightPane(self):
+        rightSplitter = QtWidgets.QSplitter(Qt.Vertical)
+
+        # 上半部分布局
+        topRightWidget = QtWidgets.QWidget()
+        topRightLayout = self.setuptopRightLayout()
+        topRightWidget.setLayout(topRightLayout)
+        rightSplitter.addWidget(topRightWidget)
+
+        # 下半部分布局
+        bottomRightWidget = QtWidgets.QWidget()
+        bottomRightLayout = self.setupbottomRightLayout()
+        bottomRightWidget.setLayout(bottomRightLayout)
+        rightSplitter.addWidget(bottomRightWidget)
+
+        # 将垂直分割器添加到主分割器中
+        self.splitter.insertWidget(1, rightSplitter)
+
+        # 如果属性表格在下半部分布局中
+        bottomRightLayout.addWidget(self.propTable)
+        topRightLayout.addWidget(self.propTable)
+
+    def setuptopRightLayout(self):
+        layout = QtWidgets.QVBoxLayout()
+        table = QtWidgets.QTableWidget(0, 2, self)
+
+        table.verticalHeader().hide()  # 隐藏垂直表头
+        table.setHorizontalHeaderLabels(["杆件与结点编号", "刚度值"])
+        # 设定第1列的宽度为 180像素
+        table.setColumnWidth(0, 180)
+        tableHeader = table.horizontalHeader()
+        tableHeader.setStretchLastSection(True)
+
+        tableStyle = '''
+                QTableWidget {
+                    gridline-color: #e0e0e0;
+                }
+
+                QHeaderView::section {     
+                    background-color: #f8f8f8;
+                    border-top: 0px solid #e0e0e0;
+                    border-left: 0px solid #e0e0e0;
+                    border-right: 1px solid #e0e0e0;
+                    border-bottom: 1px solid #e0e0e0;
+                }
+                '''
+
+
+        table.setStyleSheet(tableStyle)
+
+        self.propTable = table
+        layout.addWidget(self.propTable)
+        return layout
+
+    def setupbottomRightLayout(self):
+        layout = QtWidgets.QVBoxLayout()
+        table = QtWidgets.QTableWidget(0, 2, self)
+
+        table.verticalHeader().hide()  # 隐藏垂直表头
+        table.setHorizontalHeaderLabels(["属性", "值"])
+        # 设定第1列的宽度为 180像素
+        table.setColumnWidth(0, 180)
+        tableHeader = table.horizontalHeader()
+        tableHeader.setStretchLastSection(True)
+
+        tableStyle = '''
+                QTableWidget {
+                    gridline-color: #e0e0e0;
+                }
+
+                QHeaderView::section {     
+                    background-color: #f8f8f8;
+                    border-top: 0px solid #e0e0e0;
+                    border-left: 0px solid #e0e0e0;
+                    border-right: 1px solid #e0e0e0;
+                    border-bottom: 1px solid #e0e0e0;
+                }
+                '''
+
+
+        table.setStyleSheet(tableStyle)
+
+        self.propTable = table
+        layout.addWidget(self.propTable)
+        return layout
+
+    def setPropTable(self, props):
+        table = self.propTable
+
+        # 先解除 单元格改动信号处理函数
+        try:
+            table.cellChanged.disconnect(self.itemPropChanged)
+        except:
+            pass
+
+        table.setRowCount(0)  # 删除原来的内容
+
+        row = 0
+        for name, value in props.items():
+            table.insertRow(row)
+            item = QtWidgets.QTableWidgetItem(name)
+            item.setFlags(Qt.ItemIsEnabled)
+            table.setItem(row, 0, item)
+            table.setItem(row, 1, QtWidgets.QTableWidgetItem(value))
+            row += 1
+
+        # 再指定单元格改动信号处理函数
+        table.cellChanged.connect(self.itemPropChanged)
+
+    def itemPropChanged(self, row, column): #改动的单元格的行数row和列数column
+        # 获取更改内容
+        cfgName = self.propTable.item(row, 0).text()  # 首列为配置名称
+        cfgValue = self.propTable.item(row, column).text()
+
+        items = self.scene.selectedItems()
+        if len(items) != 1:
+            print('item未选中状态')
+            return
+
+        selected = items[0]
+        selected.itemPropChanged(cfgName, cfgValue) #告诉前面的item要改变cfgname属性为cfgValue
+
+
+if __name__ == "__main__":
+    app = QtWidgets.QApplication(sys.argv)
+    app.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.Round)
+    window = DrawingWidget()
+    window.setWindowTitle("杆系结构内力计算")
+    window.show()
+    sys.exit(app.exec_())

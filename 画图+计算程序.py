@@ -35,8 +35,6 @@ class TrussDrawingWidget(QWidget):
         self.show_segments_button.clicked.connect(self.show_segments)
         self.save_button = QPushButton("Save to TXT")   #将所需计算数据保存至txt文件
         self.save_button.clicked.connect(lambda: window.save_info_to_txt('计算数据.txt'))
-        # self.calculate = QPushButton("calculate")   
-        # self.calculate.clicked.connect(lambda: window.cal)
         self.run_button = QPushButton("calculate")
         self.run_button.clicked.connect(self.run_another_script)
  
@@ -53,9 +51,9 @@ class TrussDrawingWidget(QWidget):
         # 初始化线段和结点的计数器和字典
         self.segment_index = 1
         self.node_index = 1
-        self.node_dict = {}
+        self.node_dict = {}       #node_dict是以坐标为key以结点编号为值
         self.segments_dict = {}
-        self.node_info_dict = {}  # 记录结点信息的字典
+        self.node_info_dict = {}  #node_info_dict是以坐标为key记录结点信息的字典，每一个key对应的值为{'index': self.node_index, 'support_type': 'None'}
 
         # 设置布局
         layout = QVBoxLayout()
@@ -82,7 +80,6 @@ class TrussDrawingWidget(QWidget):
         layout.addWidget(self.canvas)
         self.setLayout(layout)
         button_layout.addWidget(self.save_button)   #增加计算数据保存按钮
-        # button_layout.addWidget(self.calculate)
         button_layout.addWidget(self.run_button) 
     def add_segment(self):
         # 获取用户输入
@@ -414,7 +411,7 @@ class TrussDrawingWidget(QWidget):
         print("Saved already!")
     #计算部分
     def run_another_script(self):
-        script_path = "E:\\pycharm\\Civil-Calculate-Software\\计算程序.py"  # 替换为.py文件路径
+        script_path = "C:\\Users\\li_ju\\Desktop\\homework\\Civil-Calculate-Software\\计算程序.py"  # 替换为.py文件路径
         process = QProcess(self)
         process.startDetached("python", [script_path])
 
