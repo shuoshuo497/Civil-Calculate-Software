@@ -394,27 +394,33 @@ class TrussDrawingWidget(QWidget):
     def calculate_node_displacements_and_forces(self):
         # 计算节点的位移和受力
         node_displacements_forces_dict= {}  # 存储节点位移和力的字典
-        # 假设我们有一个外部力字典，它给出了每个节点的力和方向 如下
-        external_forces={1:(0,0), 3:(0,0), 4:(0, 0)}
+        # 假设我们有一个外部力字典，它给出了每个节点的力和方向 如下初始化外部力典external_forces={}
+        external_forces={}
+        # 例如 external_forces = {1:(0,0), 2:(0, 0), 3:(0,0), 4:(0, 0)}
+        for coord in self.node_dict:
+            external_forces[self.node_dict[coord]] = (0,0)
         for key, value in self.force_dict.items():
             external_forces[self.node_dict[key]] = value
-        #external_forces = {1:('x1','y1'), 2:('x2', 'y2'), 3:(0,0), 4:('x4', 'y4')}
+
         for node_data in self.node_info_dict.values():
             node_index = node_data['index']
             support_type = node_data['support_type']
-            if support_type == 'Pinned Support':    
-                displacement_x, displacement_y = 0, 0
-            else:
-            # 其他类型的支撑，这里需要根据实际的分析方法来计算位移
-            # 这里只是一个示例，实际情况可能需要更复杂的计算
+            if support_type == 'No Support':    
                 displacement_x, displacement_y = 1, 1
-            # def are_all_strings(tuple_values):      #检查元组中的所有元素是否都是字符串
-            #     return all(isinstance(value, str) for value in tuple_values)
-            # if are_all_strings(external_forces[node_index]):
-            #     force_x = external_forces[node_index][0]
-            #     force_y = external_forces[node_index][1]
-            # else:
-            #     force_x, force_y = external_forces[node_index]
+            elif support_type == 'Pinned Support':
+                displacement_x, displacement_y = 0, 0
+            elif support_type == 'Slide Support':
+                displacement_x, displacement_y = 1, 0
+            else:
+                displacement_x, displacement_y = 0, 0
+        #   支持结点力为未知量的时候计算
+        # def are_all_strings(tuple_values):      #检查元组中的所有元素是否都是字符串
+        #     return all(isinstance(value, str) for value in tuple_values)
+        # if are_all_strings(external_forces[node_index]):
+        #     force_x = external_forces[node_index][0]
+        #     force_y = external_forces[node_index][1]
+        # else:
+        #     force_x, force_y = external_forces[node_index]
 
             force_x = external_forces[node_index][0]
             force_y = external_forces[node_index][1]
