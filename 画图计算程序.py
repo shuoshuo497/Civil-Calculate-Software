@@ -401,7 +401,6 @@ class TrussDrawingWidget(QWidget):
             external_forces[self.node_dict[coord]] = (0,0)
         for key, value in self.force_dict.items():
             external_forces[self.node_dict[key]] = value
-
         for node_data in self.node_info_dict.values():
             node_index = node_data['index']
             support_type = node_data['support_type']
@@ -414,13 +413,13 @@ class TrussDrawingWidget(QWidget):
             else:
                 displacement_x, displacement_y = 0, 0
         #   支持结点力为未知量的时候计算
-        # def are_all_strings(tuple_values):      #检查元组中的所有元素是否都是字符串
-        #     return all(isinstance(value, str) for value in tuple_values)
-        # if are_all_strings(external_forces[node_index]):
-        #     force_x = external_forces[node_index][0]
-        #     force_y = external_forces[node_index][1]
-        # else:
-        #     force_x, force_y = external_forces[node_index]
+            # def are_all_strings(tuple_values):      #检查元组中的所有元素是否都是字符串
+            #     return all(isinstance(value, str) for value in tuple_values)
+            # if are_all_strings(external_forces[node_index]):
+            #     force_x = external_forces[node_index][0]
+            #     force_y = external_forces[node_index][1]
+            # else:
+            #     force_x, force_y = external_forces[node_index]
 
             force_x = external_forces[node_index][0]
             force_y = external_forces[node_index][1]
@@ -457,7 +456,8 @@ class TrussDrawingWidget(QWidget):
         with open(filename, 'w', encoding='utf-8') as f:
             f.write(text)
         print("Saved already!")
-    #计算部分
+    
+    #运行计算部分脚本
     def run_cal_script(self):
         script_path = "C:\\Users\\li_ju\\Desktop\\homework\\Civil-Calculate-Software\\计算程序.py"  # 替换为.py文件路径
         process = QProcess(self)
