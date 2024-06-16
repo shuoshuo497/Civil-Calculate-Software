@@ -1,9 +1,10 @@
 from numpy import *
 from math import *
 import sys,os,sympy,codecs
+import subprocess
 
 def main():
-    path="C:\\Users\\li_ju\\Desktop\\homework\\Civil-Calculate-Software\计算数据.txt"
+    path="C:\\Users\\li_ju\\Desktop\\homework\\计算数据.txt"
     try:
         file=codecs.open(path,'r',encoding='utf-8')
     except:
@@ -88,6 +89,10 @@ def main():
         #print('结点%d位移：L/EA('%(i+1),uv[0,2*i],',',uv[0,2*i+1],end=')\n')
 
     print('计算完成，结果保存在"计算结果.txt"\n')
+    #运行后处理部分脚本
+    # script_path = "C:\\Users\\li_ju\\Desktop\\homework\\Civil-Calculate-Software\\后处理程序.py"  
+    # 替换为.py文件路径
+    subprocess.run(['python', 'C:\\Users\\li_ju\\Desktop\\homework\\Civil-Calculate-Software\\后处理程序.py'])
 
 
 #建立元素刚度矩阵
