@@ -1,6 +1,6 @@
 import sys
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel
-from 画图程序 import TrussDrawingWidget  # 导入正确的结点坐标绘图类
+from 画图计算程序 import TrussDrawingWidget  # 导入正确的结点坐标绘图类
 
 
 class MainWindow(QWidget):
